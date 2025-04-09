@@ -163,7 +163,6 @@ function setup() {
 	app.stage.addChild(boardContainer);
     boardContainer.addChild(graphics);
 	boardContainer.addChild(highlightContainer);
-	//boardContainer.addChild(pieceContainer);
 	app.stage.addChild(pieceContainer);
 	app.stage.addChild(textContainer);
 	
@@ -241,8 +240,11 @@ function setup() {
 	// Create Next button (initially hidden)
 	nextButton = createNextButton();
 	nextButton.visible = false;
-	// Add to app.stage directly to ensure it's on top of everything
-	app.stage.addChild(nextButton);
+	
+	// Create a separate container for the next button to ensure it's on top
+	let nextButtonContainer = new PIXI.Container();
+	nextButtonContainer.addChild(nextButton);
+	app.stage.addChild(nextButtonContainer);
 	
 	window.addEventListener('resize', resize);
 	resize();
@@ -672,7 +674,15 @@ function onPuzzleFailed() {
 function clearBoard() {
 	pieceContainer.parent.removeChild(pieceContainer);
 	pieceContainer = new PIXI.Container();
+	
+	// Make sure the piece container is added before the next button container
+	// This ensures the next button stays on top
+	let nextButtonContainer = nextButton.parent;
+	app.stage.removeChild(nextButtonContainer);
+	
 	app.stage.addChild(pieceContainer);
+	app.stage.addChild(nextButtonContainer);
+	
 	resize();
 }
 
