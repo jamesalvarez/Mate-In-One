@@ -71,6 +71,12 @@ const nextButtonStyle = new PIXI.TextStyle({
     fontSize: 24,
     fontWeight: "bold"
 });
+const toggleButtonStyle = new PIXI.TextStyle({
+    fill: "#FFFFFF",
+    fontFamily: "\"Lucida Console\", Monaco, monospace",
+    fontSize: 18,
+    fontWeight: "bold"
+});
 const loadTextStyle = new PIXI.TextStyle({
     fill: "#000000",
     fontFamily: "\"Lucida Console\", Monaco, monospace",
@@ -111,6 +117,8 @@ var puzzleCounterInput;
 var puzzleCounterContainer;
 var nextButton;
 var nextButtonVisible = false;
+var autoSolveMode = false;
+var autoSolveToggle;
 
 function setup() {
 	
@@ -246,6 +254,10 @@ function setup() {
 	nextButtonContainer.addChild(nextButton);
 	app.stage.addChild(nextButtonContainer);
 	
+	// Create Auto-Solve toggle button
+	autoSolveToggle = createAutoSolveToggle();
+	textContainer.addChild(autoSolveToggle);
+	
 	window.addEventListener('resize', resize);
 	resize();
 	
@@ -339,6 +351,9 @@ function resize() {
 	timerText.scale.set(scale);
 	loadingText.scale.set(scale);
 	puzzleCounterContainer.scale.set(scale);
+	if (autoSolveToggle) {
+		autoSolveToggle.scale.set(scale * 0.8);
+	}
 	
 	setTextPositions();
 	
@@ -374,12 +389,60 @@ function loadSpecificPuzzle(index) {
 					timerValue = startTime;
 				}
 				timerPaused = false;
+				
+				// If auto-solve mode is on, automatically solve the puzzle
+				if (autoSolveMode) {
+					setTimeout(autoSolvePuzzle, 500);
+				}
 			}
 		}
 		else {
 			// Skip invalid puzzle
 			loadNextPuzzle();
 		}
+	}
+}
+
+function autoSolvePuzzle() {
+	if (!autoSolveMode) return;
+	
+	// Find the checkmate move
+	let moves = chess.moves();
+	let mateMove = null;
+	
+	for (let i = 0; i < moves.length; i++) {
+		if (moves[i].san.includes('#')) {
+			mateMove = moves[i];
+			break;
+		}
+	}
+	
+	if (mateMove) {
+		// Get the coordinates for the move
+		let fromCoord = coordFromAlgebraic(mateMove.from);
+		let toCoord = coordFromAlgebraic(mateMove.to);
+		
+		// Highlight the move
+		clearHighlights();
+		highlightSquare(fromCoord, highlightCol_light, highlightCol_dark);
+		highlightSquare(toCoord, highlightCol_light, highlightCol_dark);
+		
+		// Make the move
+		chess.move(mateMove);
+		setBoardFromFen(chess.fen());
+		
+		// Highlight the checkmated king
+		highlightSquare(blackKingCoord, checkmateHighlight_light, checkmateHighlight_dark);
+		
+		// Update the solved count
+		numSolved++;
+		numSolvedText.text = 'solved: ' + numSolved;
+		
+		// Show the next button
+		showNextButton();
+		
+		// Play the correct sound
+		playSound(puzzleCorrectSound);
 	}
 }
 
@@ -766,6 +829,15 @@ function setTextPositions() {
 		// Make sure the button is scaled properly
 		nextButton.scale.set(boardContainer.scale.x);
 	}
+	
+	// Position auto-solve toggle in the top-right corner of the board
+	if (autoSolveToggle) {
+		autoSolveToggle.position.set(
+			boardEdgeLeft + boardContainer.width - autoSolveToggle.width - 10,
+			boardContainer.position.y - autoSolveToggle.height - 10
+		);
+		autoSolveToggle.scale.set(boardContainer.scale.x * 0.8);
+	}
 }
 
 function createNextButton() {
@@ -823,6 +895,64 @@ function hideNextButton() {
 	nextButton.visible = false;
 	nextButtonVisible = false;
 	inputDisabled = false;
+}
+
+function createAutoSolveToggle() {
+	let container = new PIXI.Container();
+	
+	// Create button background
+	let background = new PIXI.Graphics();
+	background.beginFill(0x34495e);
+	background.drawRoundedRect(0, 0, 200, 40, 8);
+	background.endFill();
+	
+	// Create button text
+	let text = new PIXI.Text("Auto-Solve: OFF", toggleButtonStyle);
+	text.anchor.set(0.5);
+	text.position.set(background.width/2, background.height/2);
+	
+	container.addChild(background);
+	container.addChild(text);
+	
+	// Make button interactive
+	container.interactive = true;
+	container.buttonMode = true;
+	
+	// Add hover effects
+	container.on('pointerover', function() {
+		background.clear();
+		background.beginFill(autoSolveMode ? 0x16a085 : 0x2c3e50);
+		background.drawRoundedRect(0, 0, 200, 40, 8);
+		background.endFill();
+	});
+	
+	container.on('pointerout', function() {
+		background.clear();
+		background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
+		background.drawRoundedRect(0, 0, 200, 40, 8);
+		background.endFill();
+	});
+	
+	// Add click handler
+	container.on('pointerdown', function() {
+		autoSolveMode = !autoSolveMode;
+		
+		// Update button appearance
+		background.clear();
+		background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
+		background.drawRoundedRect(0, 0, 200, 40, 8);
+		background.endFill();
+		
+		// Update text
+		text.text = "Auto-Solve: " + (autoSolveMode ? "ON" : "OFF");
+		
+		// If turning on auto-solve and a puzzle is currently displayed, solve it
+		if (autoSolveMode && gameRunning && !inputDisabled) {
+			autoSolvePuzzle();
+		}
+	});
+	
+	return container;
 }
 
 function playSound(sound) {
