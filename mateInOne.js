@@ -6,8 +6,12 @@ var nativeSize = 800;
 // Confetti variables
 var confettiContainer;
 var confettiParticles = [];
-var confettiColors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0xFFA500, 0x800080];
+var confettiColors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0xFFA500, 0x800080, 0x32CD32, 0x4169E1, 0xFFD700, 0xFF4500];
 var confettiRunning = false;
+var confettiDuration = 0;
+var maxConfettiDuration = 5000; // 5 seconds minimum duration
+var confettiWaves = 0;
+var maxConfettiWaves = 3; // Number of waves of confetti
 
 let app = new PIXI.Application({
 	autoResize: true,
@@ -986,44 +990,113 @@ function createConfetti() {
 		confettiContainer.removeChild(confettiContainer.children[0]);
 	}
 	confettiParticles = [];
+	
+	// Reset confetti timing
+	confettiDuration = 0;
+	confettiWaves = 0;
+	
+	// Create initial wave of confetti
+	createConfettiWave();
+	
+	confettiRunning = true;
+}
 
-	// Create new confetti particles
-	for (let i = 0; i < 150; i++) {
+function createConfettiWave() {
+	// Create multiple streams of confetti
+	for (let stream = 0; stream < 50; stream++) {
+		// Create a stream of confetti particles
+		createConfettiStream(stream);
+	}
+	
+	confettiWaves++;
+}
+
+function createConfettiStream(streamIndex) {
+	// Each stream has a different starting position and timing
+	const streamWidth = app.renderer.width;
+	const streamX = (streamIndex / 50) * streamWidth;
+	const streamDelay = streamIndex * 50; // Stagger the streams
+	
+	// Create particles for this stream
+	for (let i = 0; i < 30; i++) {
 		let particle = new PIXI.Graphics();
-		let size = Math.random() * 10 + 5;
+		let size = Math.random() * 12 + 5;
 		let colorIndex = Math.floor(Math.random() * confettiColors.length);
 
 		particle.beginFill(confettiColors[colorIndex]);
 
 		// Random shapes for variety
-		if (Math.random() < 0.33) {
+		if (Math.random() < 0.3) {
 			// Circle
 			particle.drawCircle(0, 0, size / 2);
-		} else if (Math.random() < 0.66) {
+		} else if (Math.random() < 0.6) {
 			// Square
 			particle.drawRect(-size/2, -size/2, size, size);
-		} else {
+		} else if (Math.random() < 0.8) {
 			// Star
 			drawStar(particle, 0, 0, 5, size/2, size/4);
+		} else {
+			// Heart
+			drawHeart(particle, 0, 0, size/2);
 		}
 
 		particle.endFill();
 
-		// Set initial position
-		particle.x = Math.random() * app.renderer.width;
-		particle.y = -50 - Math.random() * 100;
+		// Set initial position with variation around the stream position
+		particle.x = streamX + Math.random() * 150 - 75;
+		particle.y = -50 - Math.random() * 400 - streamDelay;
 
-		// Set velocity
-		particle.vx = Math.random() * 4 - 2;
-		particle.vy = Math.random() * 2 + 3;
-		particle.va = Math.random() * 0.1 - 0.05; // Angular velocity
+		// Set velocity with more variation (reduced speed even further)
+		particle.vx = Math.random() * 2 - 1;
+		particle.vy = Math.random() * 1 + 0.5; // Quarter of the original speed
+		
+		// Some particles spin fast, others slow
+		if (Math.random() < 0.2) {
+			// Fast spinning particles
+			particle.va = Math.random() * 0.4 - 0.2; // 4x faster spin for some
+		} else {
+			// Normal spinning particles
+			particle.va = Math.random() * 0.05 - 0.025; // Quarter of the original angular velocity
+		}
 		particle.rotation = Math.random() * Math.PI * 2;
+		
+		// Add some "flutter" effect
+		particle.flutter = Math.random() * 0.3 + 0.1;
+		particle.flutterSpeed = Math.random() * 0.2 + 0.1;
+		particle.flutterOffset = Math.random() * Math.PI * 2;
+		
+		// Add lifetime for particles (quadrupled to compensate for slower fall)
+		particle.lifetime = Math.random() * 12000 + 20000; // 20-32 seconds
+		particle.age = 0;
 
 		confettiContainer.addChild(particle);
 		confettiParticles.push(particle);
 	}
+}
 
-	confettiRunning = true;
+function drawHeart(graphics, x, y, size) {
+	// Draw a heart shape
+	graphics.moveTo(x, y + size * 0.3);
+	graphics.bezierCurveTo(
+		x, y, 
+		x - size, y, 
+		x - size, y + size
+	);
+	graphics.bezierCurveTo(
+		x - size, y + size * 1.5, 
+		x, y + size * 1.5, 
+		x, y + size * 2
+	);
+	graphics.bezierCurveTo(
+		x, y + size * 1.5, 
+		x + size, y + size * 1.5, 
+		x + size, y + size
+	);
+	graphics.bezierCurveTo(
+		x + size, y, 
+		x, y, 
+		x, y + size * 0.3
+	);
 }
 
 function drawStar(graphics, x, y, points, outerRadius, innerRadius) {
@@ -1043,29 +1116,57 @@ function drawStar(graphics, x, y, points, outerRadius, innerRadius) {
 
 function updateConfetti(dt) {
 	if (!confettiRunning) return;
+	
+	// Update total confetti duration
+	confettiDuration += dt;
+	
+	// Create new waves of confetti periodically
+	if (confettiWaves < maxConfettiWaves && confettiDuration > 1000 * confettiWaves) {
+		createConfettiWave();
+	}
 
-	let allOffScreen = true;
-
-	for (let i = 0; i < confettiParticles.length; i++) {
+	let particlesRemaining = false;
+	
+	// Update each particle
+	for (let i = confettiParticles.length - 1; i >= 0; i--) {
 		let particle = confettiParticles[i];
+		
+		// Update age
+		particle.age += dt;
+		
+		// Remove particles that have exceeded their lifetime
+		if (particle.age > particle.lifetime) {
+			confettiContainer.removeChild(particle);
+			confettiParticles.splice(i, 1);
+			continue;
+		}
 
-		// Update position
-		particle.x += particle.vx;
+		// Update position with flutter effect
+		let flutterX = Math.sin(particle.age * particle.flutterSpeed + particle.flutterOffset) * particle.flutter;
+		particle.x += particle.vx + flutterX;
 		particle.y += particle.vy;
 		particle.rotation += particle.va;
 
-		// Add gravity and wind
-		particle.vy += 0.1;
-		particle.vx += Math.random() * 0.2 - 0.1;
+		// Add gravity and wind (reduced even further)
+		particle.vy += 0.02; // Quarter of the original gravity
+		particle.vx += Math.random() * 0.08 - 0.04; // Quarter of the original wind effect
+		
+		// Slow down horizontal movement over time
+		particle.vx *= 0.99;
+		
+		// Add some randomness to movement
+		if (Math.random() < 0.05) {
+			particle.vx += Math.random() * 0.6 - 0.3;
+		}
 
-		// Check if particle is still on screen
-		if (particle.y < app.renderer.height + 50) {
-			allOffScreen = false;
+		// Check if particle is still active
+		if (particle.y < app.renderer.height + 100) {
+			particlesRemaining = true;
 		}
 	}
 
-	// Stop animation if all particles are off screen
-	if (allOffScreen) {
+	// Stop animation if minimum duration has passed and no particles remain
+	if (!particlesRemaining && confettiDuration > maxConfettiDuration) {
 		confettiRunning = false;
 		while (confettiContainer.children.length > 0) {
 			confettiContainer.removeChild(confettiContainer.children[0]);
