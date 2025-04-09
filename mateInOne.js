@@ -3,13 +3,19 @@ var TextureCache = PIXI.utils.TextureCache;
 var Point = PIXI.Point;
 var nativeSize = 800;
 
-let app = new PIXI.Application({ 
+// Confetti variables
+var confettiContainer;
+var confettiParticles = [];
+var confettiColors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0xFFA500, 0x800080];
+var confettiRunning = false;
+
+let app = new PIXI.Application({
 	autoResize: true,
 	width: nativeSize,
-	height: nativeSize, 
+	height: nativeSize,
 	antialias:true,
 	transparent : true,
-	resolution: 2 
+	resolution: 2
 });
 
 app.renderer.backgroundColor = 0x00000000;
@@ -117,11 +123,14 @@ var puzzleCounterInput;
 var puzzleCounterContainer;
 var nextButton;
 var nextButtonVisible = false;
-var autoSolveMode = false;
+var autoSolveMode = true;
 var autoSolveToggle;
+var mateMove = null;
+var mateMoveFrom = null;
+var mateMoveTo = null;
 
 function setup() {
-	
+
 	// Get url params
 	if (GetURLParameter('suddenDeath') == 'true') {
 		suddenDeath = true;
@@ -136,28 +145,28 @@ function setup() {
 	if (!isNaN(startTimeParam)) {
 		startTime = startTimeParam;
 	}
-	
+
 	if (GetURLParameter('sound') == 'false') {
 		soundOn = false;
 	}
-	
+
 	//
 	if (!gameIsTimed) {
 		suddenDeath = false;
 	}
-	
+
 	document.oncontextmenu = document.body.oncontextmenu = function(event) {onRightClick(event);};
-	
+
     // Draw board
     boardContainer = new PIXI.Container();
 	boardContainer.interactive = true;
 	boardContainer.on('pointermove',onDrag);
 	boardContainer.on('pointerdown',onPointerDownOnBoard);
-	
+
 	pieceContainer = new PIXI.Container();
 	highlightContainer = new PIXI.Container();
 	textContainer = new PIXI.Container();
-	
+
 	let graphics = new PIXI.Graphics();
     for	(let i = 0; i <8; i ++) {
         for	(let j = 0; j < 8; j ++){
@@ -167,13 +176,17 @@ function setup() {
             graphics.drawRect(i*size, j*size, size, size);
         }
     }
-	
+
+	// Create confetti container
+	confettiContainer = new PIXI.Container();
+
 	app.stage.addChild(boardContainer);
     boardContainer.addChild(graphics);
 	boardContainer.addChild(highlightContainer);
 	app.stage.addChild(pieceContainer);
 	app.stage.addChild(textContainer);
-	
+	app.stage.addChild(confettiContainer);
+
     // Pieces in order: King, Queen, Bishop, Knight, Rook, Pawn [White,Black]
     pieceTextures = new Array(6);
     for (let i = 0; i < 6; i ++){
@@ -192,40 +205,40 @@ function setup() {
             pieceTextures[j][i] = texture;
         }
     }
-	
-	
+
+
 	// text
 	numSolvedText = new PIXI.Text('solved: 0', numSolvedTextStyle);
 	loadingText = new PIXI.Text('fetching puzzles...', loadTextStyle);//
-	
+
 
 	timerText = new PIXI.Text('', timerTextStyle);
 	if (gameIsTimed) {
 		timerText.text = 'Time: 0.0';
 	}
 	textContainer.addChild(timerText);
-	
+
 	textContainer.addChild(numSolvedText);
 	textContainer.addChild(loadingText);
-	
+
 	// Create puzzle counter and input
 	puzzleCounterContainer = new PIXI.Container();
 	puzzleCounterText = new PIXI.Text('Puzzle: 1 / ?', puzzleCounterTextStyle);
-	
+
 	// Create input box for puzzle number
 	let inputBackground = new PIXI.Graphics();
 	inputBackground.beginFill(0xFFFFFF);
 	inputBackground.drawRect(0, 0, 80, 30);
 	inputBackground.endFill();
-	
+
 	puzzleCounterInput = new PIXI.Text('1', puzzleCounterInputStyle);
 	puzzleCounterInput.x = 5;
 	puzzleCounterInput.y = 3;
-	
+
 	// Make input interactive
 	inputBackground.interactive = true;
 	inputBackground.buttonMode = true;
-	
+
 	inputBackground.on('pointerdown', function() {
 		let newPuzzleNum = prompt("Enter puzzle number (1-" + totalPuzzles + "):", currentPuzzleNumber);
 		if (newPuzzleNum !== null) {
@@ -239,28 +252,28 @@ function setup() {
 			}
 		}
 	});
-	
+
 	puzzleCounterContainer.addChild(inputBackground);
 	puzzleCounterContainer.addChild(puzzleCounterInput);
 	puzzleCounterContainer.addChild(puzzleCounterText);
 	textContainer.addChild(puzzleCounterContainer);
-	
+
 	// Create Next button (initially hidden)
 	nextButton = createNextButton();
 	nextButton.visible = false;
-	
+
 	// Create a separate container for the next button to ensure it's on top
 	let nextButtonContainer = new PIXI.Container();
 	nextButtonContainer.addChild(nextButton);
 	app.stage.addChild(nextButtonContainer);
-	
+
 	// Create Auto-Solve toggle button
 	autoSolveToggle = createAutoSolveToggle();
 	textContainer.addChild(autoSolveToggle);
-	
+
 	window.addEventListener('resize', resize);
 	resize();
-	
+
 	if (useLocalFile) {
 		activePuzzles = fens.split('\n');
 		onPuzzlesLoaded();
@@ -269,14 +282,14 @@ function setup() {
 		// OLD
 		// fetch initial puzzle set;
 	}
-	
-	
+
+
 	puzzleCorrectSound = new Audio('Resources/Audio/PuzzleCorrect.mp3');
 	puzzleFailedSound = new Audio('Resources/Audio/PuzzleFailed.mp3');
 	moveSound = new Audio('Resources/Audio/Move.mp3');
 	timeOutSound = new Audio('Resources/Audio/TimeOut.mp3');
 	timeWarningSound = new Audio('Resources/Audio/TimeWarning.mp3');
-	
+
 }
 
 function onPuzzlesLoaded() {
@@ -284,18 +297,20 @@ function onPuzzlesLoaded() {
 		preloadPuzzles();
 	}//
 	loadingText.text = "";
-	
+
 	// Set total puzzles count
 	totalPuzzles = activePuzzles.length;
 	updatePuzzleCounterText();
-	
+
+	gameRunning = true;
+
 	loadSpecificPuzzle(puzzleIndex);
-	
+
 	if (gameIsTimed) {
 		timerValue = startTime;
 	}
-	
-	gameRunning = true;
+
+
 	lastUpdateTime = Date.now();
 	app.ticker.add(() => timeLoop());
 }
@@ -330,10 +345,10 @@ function preloadPuzzles() {
 function resize() {
 	let inset = 20;//
 	let scalePercent = 0.85; // Reduced from 0.9 to make board smaller
-	
+
 	let w = window.innerWidth-inset;
 	let h = window.innerHeight-inset;
-	
+
 	app.renderer.resize(w,h);
 	let minDim = Math.min(w,h);
 
@@ -345,7 +360,7 @@ function resize() {
 	let verticalOffset = 40;
 	boardContainer.position.set((w-boardContainer.width)/2,(h-boardContainer.height)/2 - dstToTopEdge*.5 + verticalOffset);
 	pieceContainer.position.set(boardContainer.position.x,boardContainer.position.y);
-	
+
 	// position text
 	numSolvedText.scale.set(scale);
 	timerText.scale.set(scale);
@@ -354,9 +369,9 @@ function resize() {
 	if (autoSolveToggle) {
 		autoSolveToggle.scale.set(scale * 0.8);
 	}
-	
+
 	setTextPositions();
-	
+
 	loadingText.position.set(boardContainer.position.x + boardContainer.width/2 - loadingText.width/2, boardContainer.position.y + boardContainer.height/2 - loadingText.height*1.25);//
 }
 
@@ -366,7 +381,7 @@ function loadNextPuzzle() {
 		puzzleIndex = (puzzleIndex + 1) % activePuzzles.length;
 		currentPuzzleNumber = puzzleIndex + 1;
 		updatePuzzleCounterText();
-		
+
 		loadSpecificPuzzle(puzzleIndex);
 	}
 	else {
@@ -375,11 +390,13 @@ function loadNextPuzzle() {
 }
 
 function loadSpecificPuzzle(index) {
+	console.log('Loading puzzle ' + (index + 1) + ' of ' + totalPuzzles);
 	if (activePuzzles != undefined && activePuzzles.length > 0 && index < activePuzzles.length) {
 		let myFen = activePuzzles[index].split(',')[1];
 
 		// double check that given position is mate in one, as there are currently some errors with puzzle generator where en-passant is involved.
 		if (validateMateInOne(myFen)) {
+			console.log('Puzzle loaded, autosolvemode: ' + autoSolveMode + ', gameRunning: ' + gameRunning);
 			// If auto-solve mode is on, find and make the mate move immediately
 			if (autoSolveMode && gameRunning) {
 				chess = new Chess(myFen);
@@ -387,7 +404,7 @@ function loadSpecificPuzzle(index) {
 			} else {
 				setBoardFromFen(myFen);
 				chess = new Chess(myFen);
-				
+
 				if (gameRunning) {
 					inputDisabled = false;
 					if (resetTimerOnSolve) {
@@ -405,36 +422,35 @@ function loadSpecificPuzzle(index) {
 }
 
 function autoSolvePuzzle() {
+	console.log('Auto-solving puzzle...');
 	if (!autoSolveMode) return;
-	
+
 	// Find the checkmate move
 	let moves = chess.moves();
 	let mateMove = null;
-	
+
 	for (let i = 0; i < moves.length; i++) {
 		if (moves[i].san.includes('#')) {
 			mateMove = moves[i];
 			break;
 		}
 	}
-	
+
 	if (mateMove) {
 		// Make the move without highlighting
 		chess.move(mateMove);
 		setBoardFromFen(chess.fen());
-		
+
 		// Clear any highlights
 		clearHighlights();
-		
+
 		// Update the solved count
 		numSolved++;
 		numSolvedText.text = 'solved: ' + numSolved;
-		
+
 		// Show the next button
 		showNextButton();
-		
-		// Play the correct sound
-		playSound(puzzleCorrectSound);
+
 	}
 }
 
@@ -443,7 +459,7 @@ function autoSolvePuzzle() {
 function setBoardFromFen(fen) {
 	clearHighlights();
 	clearBoard();
-	
+
     let boardLayout = fen.split(' ')[0];
     let rankLayouts = boardLayout.split('/');
 
@@ -463,10 +479,10 @@ function setBoardFromFen(fen) {
                 let sprite = new PIXI.Sprite(texture);
 				let pos = new Point(fileIndex*size+size*.5,rankIndex*size+size*.5);
 				let coord = squareCoordFromPoint(pos);
-				
+
                 initPieceSprite(sprite, pos,size,isWhite);
                 fileIndex+=1;
-            	
+
 				if (char == 'k') {
 					blackKingCoord = coord;
 				}
@@ -477,7 +493,7 @@ function setBoardFromFen(fen) {
 }
 
 function initPieceSprite(sprite, point, size, isWhite){
-	
+
     sprite.position.set(point.x, point.y);
     sprite.width = size;
     sprite.height = size;
@@ -491,7 +507,7 @@ function initPieceSprite(sprite, point, size, isWhite){
 		sprite.on('pointerup', onPieceReleased);
 	}
     pieceContainer.addChild(sprite);
-	
+
 	let squareIndex = indexFromCoord(squareCoordFromPoint(point));
 	allSprites[squareIndex] = sprite;
 }
@@ -501,35 +517,35 @@ function onPieceSelected(sprite) {
 	if (inputDisabled){
 		return;
 	}
-	
+
 	selectedSprite = sprite;
 	holdingSprite = true;
 	fromPoint = squareCoordFromPoint(selectedSprite.position);
 	clearHighlights();
 	highlightSquare(fromPoint, highlightCol_light, highlightCol_dark);
-	
+
 	//display piece on top of all other pieces
 	pieceContainer.removeChild(sprite);
 	pieceContainer.addChild(sprite);
-	
+
 }
 
 function onPieceReleased() {
 	if (selectedSprite == null || inputDisabled) {
 		return;
 	}
-	
+
     let toPoint = squareCoordFromPoint(selectedSprite.position);
 	tryMakeMove(fromPoint,toPoint);
 }
 
 function tryMakeMove(fromCoord, toCoord) {
 	let proposedMove = pointToAlgebraic(fromCoord) +'-' + pointToAlgebraic(toCoord);
-	
+
 	let moveIsLegal = false;
 	let legalMoves = chess.moves();
 	let legalMove = null;
-	
+
 	for (let i = 0; i < legalMoves.length; i ++) {
 		let legalMoveFomatted = legalMoves[i].from + '-' + legalMoves[i].to;
 		if (legalMoveFomatted == proposedMove) {
@@ -540,13 +556,13 @@ function tryMakeMove(fromCoord, toCoord) {
 			chess.move(legalMoves[i]);
 			let moveIsCheck = chess.in_check();
 			chess.undo();
-			
+
 			if (moveIsCheck) {
 				break;
 			}
 		}
 	}
-	
+
 	if (moveIsLegal) {
 		chess.move(legalMove);
 		lastTimeWarningSecond = timeWarningStartTime;
@@ -557,7 +573,7 @@ function tryMakeMove(fromCoord, toCoord) {
 			allSprites[toIndex] = selectedSprite;
 		}
 		setBoardFromFen(chess.fen());
-		
+
 		inputDisabled = true;
 		// Puzzle solved: load next
 		if (chess.in_checkmate()) {
@@ -575,7 +591,7 @@ function tryMakeMove(fromCoord, toCoord) {
 		let pos = posFromSquareCoord(fromCoord);
 		selectedSprite.position.set(pos.x,pos.y);
 	}
-	
+
 	if (indexFromCoord(toCoord) != indexFromCoord(fromCoord)) {
 		if (!moveIsLegal) {
 	    	clearHighlights();
@@ -602,13 +618,13 @@ function highlightSquare(coord, lightHighlight, darkHighlight) {
 function makeLegalMoveAndReset() {
 	clearHighlights();
 	let moves = chess.moves();
-	
+
 	// choose move which captures piece of highest value (random if no captures available)
 	if (moves.length > 0){
 		let bestMove = moves[0];
 		let bestScore = -1;
 		let captureOrder = 'pnbrq';
-		
+
 		for (let i = 0; i < moves.length; i ++) {
 			let moveScore = 0;
 			if (moves[i].san.includes('#')) {
@@ -623,7 +639,7 @@ function makeLegalMoveAndReset() {
 				}
 			}
 		}
-		
+
 		chess.move(bestMove);
 		playSound(moveSound);
 
@@ -634,7 +650,7 @@ function makeLegalMoveAndReset() {
 }
 
 function onDrag(e){
-	if (selectedSprite != null && holdingSprite) { 
+	if (selectedSprite != null && holdingSprite) {
 		let p = e.data.getLocalPosition(boardContainer);
  		selectedSprite.position.set(p.x,p.y);
 	}
@@ -645,7 +661,7 @@ function onRightClick(event) {
 	if (selectedSprite != null) {
 		let pos = posFromSquareCoord(fromPoint);
 		selectedSprite.position.set(pos.x,pos.y);
-	
+
     	selectedSprite = null;
 		clearHighlights();
 	}
@@ -665,18 +681,23 @@ function timeLoop() {
 	var now = Date.now();
 	var dt = now - lastUpdateTime;
 	lastUpdateTime = now;
-	
+
+	// Update confetti animation
+	if (confettiRunning) {
+		updateConfetti(dt);
+	}
+
 	if (gameRunning) {
 		if (gameIsTimed && !timerPaused) {
 			timerValue -= dt*.001;
 			timerValue = Math.max(0,timerValue);
 			let formattedTimeVal = parseFloat(Math.round(timerValue * 100) / 100).toFixed(1);
 			timerText.text = "Time: " + formattedTimeVal;
-			
+
 			if (Math.floor(timerValue) < lastTimeWarningSecond) {
 				timerText.style.fill = timeAlertCols[timeWarningStartTime-Math.floor(timerValue)-1];
 				lastTimeWarningSecond = Math.floor(timerValue);
-				
+
 				playSound(timeWarningSound);
 			}
 
@@ -694,14 +715,17 @@ function onPuzzleCorrect() {
 	playSound(puzzleCorrectSound);
 
 	timerText.style.fill = numSolvedTextStyle.fill;
-	
+
 	numSolved++;
 	numSolvedText.text = 'solved: ' +numSolved;
 	highlightSquare(blackKingCoord, checkmateHighlight_light, checkmateHighlight_dark);
-	
+
 	// Show next button instead of automatically loading next puzzle
 	showNextButton();
-	
+
+	// Create confetti celebration
+	createConfetti();
+
 	if (resetTimerOnSolve) {
 		timerPaused = true;
 	}
@@ -717,7 +741,7 @@ function onPuzzleFailed() {
 			showNextButton();
 		}
 	}, blackMoveDelay);
-	
+
 	if (suddenDeath) {
 		gameOver();
 	}
@@ -729,35 +753,35 @@ function onPuzzleFailed() {
 function clearBoard() {
 	pieceContainer.parent.removeChild(pieceContainer);
 	pieceContainer = new PIXI.Container();
-	
+
 	// Make sure the piece container is added before the next button container
 	// This ensures the next button stays on top
 	let nextButtonContainer = nextButton.parent;
 	app.stage.removeChild(nextButtonContainer);
-	
+
 	app.stage.addChild(pieceContainer);
 	app.stage.addChild(nextButtonContainer);
-	
+
 	resize();
 }
 
 function gameOver() {
 	gameRunning = false;
-	
+
 	inputDisabled = true;
 	clearHighlights();
-	
+
 	if (selectedSprite != null) {
 		let pos = posFromSquareCoord(fromPoint);//
 		selectedSprite.position.set(pos.x,pos.y);
 		selectedSprite = null;
 	}
-	
+
 	// Hide next button if it's visible
 	if (nextButtonVisible) {
 		hideNextButton();
 	}
-	
+
 	timerText.style.fill = timeAlertCols[timeAlertCols.length-1];
 	timerText.text = "click here to play again";
 	timerText.interactive = true;
@@ -767,22 +791,22 @@ function gameOver() {
 
 function restartgame() {
 	lastTimeWarningSecond = timeWarningStartTime;
-	
+
 	timerText.interactive = false;
 	timerText.off("pointerdown");
 	timerText.text = "";
 	timerText.style.fill = numSolvedTextStyle.fill;
-	
+
 	timerValue = startTime;
 	inputDisabled = false;
 	numSolved = 0;
 	numSolvedText.text = "solved: " + numSolved;
-	
+
 	// Reset to first puzzle
 	puzzleIndex = 0;
 	currentPuzzleNumber = 1;
 	updatePuzzleCounterText();
-	
+
 	gameRunning = true;
 	loadSpecificPuzzle(puzzleIndex);
 }
@@ -791,7 +815,7 @@ function setTextPositions() {
 	let boardEdgeBottom = boardContainer.position.y + boardContainer.height;
 	let posY = boardEdgeBottom + numSolvedText.height * .5;
 	let boardEdgeLeft = boardContainer.position.x;
-	
+
 	if (gameIsTimed) {
 		timerText.position.set(boardEdgeLeft+boardContainer.width*.25-timerText.width/2, posY);
 		numSolvedText.position.set(boardEdgeLeft+boardContainer.width*.75-numSolvedText.width/2, posY);
@@ -799,19 +823,19 @@ function setTextPositions() {
 	else {
 		numSolvedText.position.set(boardContainer.position.x + boardContainer.width/2 - numSolvedText.width/2, posY);
 	}
-	
+
 	// Position puzzle counter above the board with more space
 	puzzleCounterContainer.position.set(
-		boardEdgeLeft + boardContainer.width/2 - puzzleCounterText.width/2, 
+		boardEdgeLeft + boardContainer.width/2 - puzzleCounterText.width/2,
 		boardContainer.position.y - puzzleCounterText.height * 2
 	);
-	
+
 	// Position the input box to the left of the counter text
 	puzzleCounterInput.x = 5;
 	puzzleCounterInput.y = 3;
 	puzzleCounterText.x = 90; // Position text after input box
 	puzzleCounterText.y = 3;
-	
+
 	// Position next button below the board, next to the solved text
 	if (nextButton) {
 		if (gameIsTimed) {
@@ -830,7 +854,7 @@ function setTextPositions() {
 		// Make sure the button is scaled properly
 		nextButton.scale.set(boardContainer.scale.x * 0.8);
 	}
-	
+
 	// Position auto-solve toggle in the top-right corner of the board
 	if (autoSolveToggle) {
 		autoSolveToggle.position.set(
@@ -843,25 +867,25 @@ function setTextPositions() {
 
 function createNextButton() {
 	let container = new PIXI.Container();
-	
+
 	// Create button background
 	let background = new PIXI.Graphics();
 	background.beginFill(0x3498db);
 	background.drawRoundedRect(0, 0, 150, 50, 10);
 	background.endFill();
-	
+
 	// Create button text
 	let text = new PIXI.Text("Next", nextButtonStyle);
 	text.anchor.set(0.5);
 	text.position.set(background.width/2, background.height/2);
-	
+
 	container.addChild(background);
 	container.addChild(text);
-	
+
 	// Make button interactive
 	container.interactive = true;
 	container.buttonMode = true;
-	
+
 	// Add hover effects
 	container.on('pointerover', function() {
 		background.clear();
@@ -869,20 +893,20 @@ function createNextButton() {
 		background.drawRoundedRect(0, 0, 150, 50, 10);
 		background.endFill();
 	});
-	
+
 	container.on('pointerout', function() {
 		background.clear();
 		background.beginFill(0x3498db);
 		background.drawRoundedRect(0, 0, 150, 50, 10);
 		background.endFill();
 	});
-	
+
 	// Add click handler
 	container.on('pointerdown', function() {
 		hideNextButton();
 		loadNextPuzzle();
 	});
-	
+
 	return container;
 }
 
@@ -900,25 +924,25 @@ function hideNextButton() {
 
 function createAutoSolveToggle() {
 	let container = new PIXI.Container();
-	
+
 	// Create button background
 	let background = new PIXI.Graphics();
-	background.beginFill(0x34495e);
+	background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
 	background.drawRoundedRect(0, 0, 200, 40, 8);
 	background.endFill();
-	
+
 	// Create button text
-	let text = new PIXI.Text("Auto-Solve: OFF", toggleButtonStyle);
+	let text = new PIXI.Text("Auto-Solve: ON", toggleButtonStyle);
 	text.anchor.set(0.5);
 	text.position.set(background.width/2, background.height/2);
-	
+
 	container.addChild(background);
 	container.addChild(text);
-	
+
 	// Make button interactive
 	container.interactive = true;
 	container.buttonMode = true;
-	
+
 	// Add hover effects
 	container.on('pointerover', function() {
 		background.clear();
@@ -926,34 +950,128 @@ function createAutoSolveToggle() {
 		background.drawRoundedRect(0, 0, 200, 40, 8);
 		background.endFill();
 	});
-	
+
 	container.on('pointerout', function() {
 		background.clear();
 		background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
 		background.drawRoundedRect(0, 0, 200, 40, 8);
 		background.endFill();
 	});
-	
+
 	// Add click handler
 	container.on('pointerdown', function() {
 		autoSolveMode = !autoSolveMode;
-		
+
 		// Update button appearance
 		background.clear();
 		background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
 		background.drawRoundedRect(0, 0, 200, 40, 8);
 		background.endFill();
-		
+
 		// Update text
 		text.text = "Auto-Solve: " + (autoSolveMode ? "ON" : "OFF");
-		
+
 		// If turning on auto-solve and a puzzle is currently displayed, solve it
 		if (autoSolveMode && gameRunning && !inputDisabled) {
 			autoSolvePuzzle();
 		}
 	});
-	
+
 	return container;
+}
+
+function createConfetti() {
+	// Clear any existing confetti
+	while (confettiContainer.children.length > 0) {
+		confettiContainer.removeChild(confettiContainer.children[0]);
+	}
+	confettiParticles = [];
+
+	// Create new confetti particles
+	for (let i = 0; i < 150; i++) {
+		let particle = new PIXI.Graphics();
+		let size = Math.random() * 10 + 5;
+		let colorIndex = Math.floor(Math.random() * confettiColors.length);
+
+		particle.beginFill(confettiColors[colorIndex]);
+
+		// Random shapes for variety
+		if (Math.random() < 0.33) {
+			// Circle
+			particle.drawCircle(0, 0, size / 2);
+		} else if (Math.random() < 0.66) {
+			// Square
+			particle.drawRect(-size/2, -size/2, size, size);
+		} else {
+			// Star
+			drawStar(particle, 0, 0, 5, size/2, size/4);
+		}
+
+		particle.endFill();
+
+		// Set initial position
+		particle.x = Math.random() * app.renderer.width;
+		particle.y = -50 - Math.random() * 100;
+
+		// Set velocity
+		particle.vx = Math.random() * 4 - 2;
+		particle.vy = Math.random() * 2 + 3;
+		particle.va = Math.random() * 0.1 - 0.05; // Angular velocity
+		particle.rotation = Math.random() * Math.PI * 2;
+
+		confettiContainer.addChild(particle);
+		confettiParticles.push(particle);
+	}
+
+	confettiRunning = true;
+}
+
+function drawStar(graphics, x, y, points, outerRadius, innerRadius) {
+	let step = Math.PI / points;
+
+	graphics.moveTo(x + outerRadius, y);
+
+	for (let i = 0; i < points * 2; i++) {
+		let radius = i % 2 === 0 ? innerRadius : outerRadius;
+		let angle = i * step + Math.PI / 2;
+		graphics.lineTo(
+			x + radius * Math.cos(angle),
+			y + radius * Math.sin(angle)
+		);
+	}
+}
+
+function updateConfetti(dt) {
+	if (!confettiRunning) return;
+
+	let allOffScreen = true;
+
+	for (let i = 0; i < confettiParticles.length; i++) {
+		let particle = confettiParticles[i];
+
+		// Update position
+		particle.x += particle.vx;
+		particle.y += particle.vy;
+		particle.rotation += particle.va;
+
+		// Add gravity and wind
+		particle.vy += 0.1;
+		particle.vx += Math.random() * 0.2 - 0.1;
+
+		// Check if particle is still on screen
+		if (particle.y < app.renderer.height + 50) {
+			allOffScreen = false;
+		}
+	}
+
+	// Stop animation if all particles are off screen
+	if (allOffScreen) {
+		confettiRunning = false;
+		while (confettiContainer.children.length > 0) {
+			confettiContainer.removeChild(confettiContainer.children[0]);
+		}
+		confettiParticles = [];
+	}
 }
 
 function playSound(sound) {
