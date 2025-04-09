@@ -111,7 +111,7 @@ var timerPaused = false;
 var lastUpdateTime;
 var gameRunning = false;
 var lastTimeWarningSecond = timeWarningStartTime;
-var soundOn = true;
+var soundOn = false;
 var puzzleCounterText;
 var puzzleCounterInput;
 var puzzleCounterContainer;
@@ -380,19 +380,20 @@ function loadSpecificPuzzle(index) {
 
 		// double check that given position is mate in one, as there are currently some errors with puzzle generator where en-passant is involved.
 		if (validateMateInOne(myFen)) {
-			setBoardFromFen(myFen);
-			chess = new Chess(myFen);
-			
-			if (gameRunning) {
-				inputDisabled = false;
-				if (resetTimerOnSolve) {
-					timerValue = startTime;
-				}
-				timerPaused = false;
+			// If auto-solve mode is on, find and make the mate move immediately
+			if (autoSolveMode && gameRunning) {
+				chess = new Chess(myFen);
+				autoSolvePuzzle();
+			} else {
+				setBoardFromFen(myFen);
+				chess = new Chess(myFen);
 				
-				// If auto-solve mode is on, automatically solve the puzzle
-				if (autoSolveMode) {
-					setTimeout(autoSolvePuzzle, 500);
+				if (gameRunning) {
+					inputDisabled = false;
+					if (resetTimerOnSolve) {
+						timerValue = startTime;
+					}
+					timerPaused = false;
 				}
 			}
 		}
@@ -418,21 +419,12 @@ function autoSolvePuzzle() {
 	}
 	
 	if (mateMove) {
-		// Get the coordinates for the move
-		let fromCoord = coordFromAlgebraic(mateMove.from);
-		let toCoord = coordFromAlgebraic(mateMove.to);
-		
-		// Highlight the move
-		clearHighlights();
-		highlightSquare(fromCoord, highlightCol_light, highlightCol_dark);
-		highlightSquare(toCoord, highlightCol_light, highlightCol_dark);
-		
-		// Make the move
+		// Make the move without highlighting
 		chess.move(mateMove);
 		setBoardFromFen(chess.fen());
 		
-		// Highlight the checkmated king
-		highlightSquare(blackKingCoord, checkmateHighlight_light, checkmateHighlight_dark);
+		// Clear any highlights
+		clearHighlights();
 		
 		// Update the solved count
 		numSolved++;
