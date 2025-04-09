@@ -404,6 +404,7 @@ function loadSpecificPuzzle(index) {
 			if (autoSolveMode && gameRunning) {
 				chess = new Chess(myFen);
 				autoSolvePuzzle();
+				inputDisabled = false;
 			} else {
 				setBoardFromFen(myFen);
 				chess = new Chess(myFen);
@@ -449,20 +450,13 @@ function autoSolvePuzzle() {
 
 		console.log('Black king square:', blackKingSquare);
 
-		// Get the attackers of the bloack kind
+		// Get the attackers of the black king
 		kingAttackers = chess.attackers(blackKingSquare[0],'w');
 
 		console.log('King attackers:', kingAttackers);
 
 		// Clear any highlights
 		clearHighlights();
-
-		// Update the solved count
-		numSolved++;
-		numSolvedText.text = 'solved: ' + numSolved;
-
-		// Show the next button
-		showNextButton();
 
 	}
 }
@@ -531,15 +525,27 @@ function onPieceSelected(sprite) {
 		return;
 	}
 
-	selectedSprite = sprite;
-	holdingSprite = true;
-	fromPoint = squareCoordFromPoint(selectedSprite.position);
-	clearHighlights();
-	highlightSquare(fromPoint, highlightCol_light, highlightCol_dark);
+	fromPoint = squareCoordFromPoint(sprite.position);
 
-	//display piece on top of all other pieces
-	pieceContainer.removeChild(sprite);
-	pieceContainer.addChild(sprite);
+	if (!autoSolveMode) {
+		selectedSprite = sprite;
+		holdingSprite = true;
+
+		clearHighlights();
+		highlightSquare(fromPoint, highlightCol_light, highlightCol_dark);
+
+		//display piece on top of all other pieces
+		pieceContainer.removeChild(sprite);
+		pieceContainer.addChild(sprite);
+	}
+
+	// In auto-solve mode, check if the user clicked on a square with a piece attacking the king
+	if (autoSolveMode && kingAttackers && kingAttackers.length > 0) {
+		let clickedSquare = pointToAlgebraic(fromPoint);
+		if (kingAttackers.includes(clickedSquare)) {
+			onPuzzleCorrect();
+		}
+	}
 
 }
 
