@@ -6,7 +6,11 @@
 </head>
 <body style="background-color:#191919;">
 	<script src="Resources/pixi.min.js"></script>
-	<script src="Resources/chess.js"></script>
+	<script type="module">
+		import { Chess, validateFen } from '/Resources/chess.js'
+		window.Chess = Chess;
+		window.validateFen = validateFen;
+	</script>
 	<script src="utility.js"></script>
 	<script src="data.js"></script>
 	<script src="mateInOne.js"></script>

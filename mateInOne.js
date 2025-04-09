@@ -129,9 +129,7 @@ var nextButton;
 var nextButtonVisible = false;
 var autoSolveMode = true;
 var autoSolveToggle;
-var mateMove = null;
-var mateMoveFrom = null;
-var mateMoveTo = null;
+var kingAttackers = [];
 
 function setup() {
 
@@ -326,10 +324,11 @@ function updatePuzzleCounterText() {
 
 function validateMateInOne(fen) {
 	let chess = new Chess(fen);
-	if (chess.validate_fen(fen)) {
+	if (validateFen(fen)) {
     	let moves = chess.moves();
+		console.log(moves);
     	for (let i = 0; i < moves.length; i ++) {
-    		if (moves[i].san.includes('#')){
+    		if (moves[i].includes('#')){
     			return true;
     		}
     	}
@@ -434,7 +433,7 @@ function autoSolvePuzzle() {
 	let mateMove = null;
 
 	for (let i = 0; i < moves.length; i++) {
-		if (moves[i].san.includes('#')) {
+		if (moves[i].includes('#')) {
 			mateMove = moves[i];
 			break;
 		}
@@ -444,6 +443,16 @@ function autoSolvePuzzle() {
 		// Make the move without highlighting
 		chess.move(mateMove);
 		setBoardFromFen(chess.fen());
+
+		// Get location of the black king
+		let blackKingSquare = chess.findPiece({ type: 'k', color: 'b' });
+
+		console.log('Black king square:', blackKingSquare);
+
+		// Get the attackers of the bloack kind
+		kingAttackers = chess.attackers(blackKingSquare[0],'w');
+
+		console.log('King attackers:', kingAttackers);
 
 		// Clear any highlights
 		clearHighlights();
@@ -631,7 +640,7 @@ function makeLegalMoveAndReset() {
 
 		for (let i = 0; i < moves.length; i ++) {
 			let moveScore = 0;
-			if (moves[i].san.includes('#')) {
+			if (moves[i].includes('#')) {
 				bestMove = moves[i];
 				break;
 			}
@@ -990,14 +999,14 @@ function createConfetti() {
 		confettiContainer.removeChild(confettiContainer.children[0]);
 	}
 	confettiParticles = [];
-	
+
 	// Reset confetti timing
 	confettiDuration = 0;
 	confettiWaves = 0;
-	
+
 	// Create initial wave of confetti
 	createConfettiWave();
-	
+
 	confettiRunning = true;
 }
 
@@ -1007,7 +1016,7 @@ function createConfettiWave() {
 		// Create a stream of confetti particles
 		createConfettiStream(stream);
 	}
-	
+
 	confettiWaves++;
 }
 
@@ -1016,7 +1025,7 @@ function createConfettiStream(streamIndex) {
 	const streamWidth = app.renderer.width;
 	const streamX = (streamIndex / 50) * streamWidth;
 	const streamDelay = streamIndex * 50; // Stagger the streams
-	
+
 	// Create particles for this stream
 	for (let i = 0; i < 30; i++) {
 		let particle = new PIXI.Graphics();
@@ -1049,7 +1058,7 @@ function createConfettiStream(streamIndex) {
 		// Set velocity with more variation (reduced speed even further)
 		particle.vx = Math.random() * 2 - 1;
 		particle.vy = Math.random() * 1 + 0.5; // Quarter of the original speed
-		
+
 		// Some particles spin fast, others slow
 		if (Math.random() < 0.2) {
 			// Fast spinning particles
@@ -1059,12 +1068,12 @@ function createConfettiStream(streamIndex) {
 			particle.va = Math.random() * 0.05 - 0.025; // Quarter of the original angular velocity
 		}
 		particle.rotation = Math.random() * Math.PI * 2;
-		
+
 		// Add some "flutter" effect
 		particle.flutter = Math.random() * 0.3 + 0.1;
 		particle.flutterSpeed = Math.random() * 0.2 + 0.1;
 		particle.flutterOffset = Math.random() * Math.PI * 2;
-		
+
 		// Add lifetime for particles (quadrupled to compensate for slower fall)
 		particle.lifetime = Math.random() * 12000 + 20000; // 20-32 seconds
 		particle.age = 0;
@@ -1078,23 +1087,23 @@ function drawHeart(graphics, x, y, size) {
 	// Draw a heart shape
 	graphics.moveTo(x, y + size * 0.3);
 	graphics.bezierCurveTo(
-		x, y, 
-		x - size, y, 
+		x, y,
+		x - size, y,
 		x - size, y + size
 	);
 	graphics.bezierCurveTo(
-		x - size, y + size * 1.5, 
-		x, y + size * 1.5, 
+		x - size, y + size * 1.5,
+		x, y + size * 1.5,
 		x, y + size * 2
 	);
 	graphics.bezierCurveTo(
-		x, y + size * 1.5, 
-		x + size, y + size * 1.5, 
+		x, y + size * 1.5,
+		x + size, y + size * 1.5,
 		x + size, y + size
 	);
 	graphics.bezierCurveTo(
-		x + size, y, 
-		x, y, 
+		x + size, y,
+		x, y,
 		x, y + size * 0.3
 	);
 }
@@ -1116,24 +1125,24 @@ function drawStar(graphics, x, y, points, outerRadius, innerRadius) {
 
 function updateConfetti(dt) {
 	if (!confettiRunning) return;
-	
+
 	// Update total confetti duration
 	confettiDuration += dt;
-	
+
 	// Create new waves of confetti periodically
 	if (confettiWaves < maxConfettiWaves && confettiDuration > 1000 * confettiWaves) {
 		createConfettiWave();
 	}
 
 	let particlesRemaining = false;
-	
+
 	// Update each particle
 	for (let i = confettiParticles.length - 1; i >= 0; i--) {
 		let particle = confettiParticles[i];
-		
+
 		// Update age
 		particle.age += dt;
-		
+
 		// Remove particles that have exceeded their lifetime
 		if (particle.age > particle.lifetime) {
 			confettiContainer.removeChild(particle);
@@ -1150,10 +1159,10 @@ function updateConfetti(dt) {
 		// Add gravity and wind (reduced even further)
 		particle.vy += 0.02; // Quarter of the original gravity
 		particle.vx += Math.random() * 0.08 - 0.04; // Quarter of the original wind effect
-		
+
 		// Slow down horizontal movement over time
 		particle.vx *= 0.99;
-		
+
 		// Add some randomness to movement
 		if (Math.random() < 0.05) {
 			particle.vx += Math.random() * 0.6 - 0.3;
