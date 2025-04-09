@@ -53,6 +53,18 @@ const timerTextStyle = new PIXI.TextStyle({
     fontSize: 30,
     fontWeight: "bold"
 });
+const puzzleCounterTextStyle = new PIXI.TextStyle({
+    fill: "#ebebeb",
+    fontFamily: "\"Lucida Console\", Monaco, monospace",
+    fontSize: 24,
+    fontWeight: "bold"
+});
+const puzzleCounterInputStyle = new PIXI.TextStyle({
+    fill: "#000000",
+    fontFamily: "\"Lucida Console\", Monaco, monospace",
+    fontSize: 24,
+    fontWeight: "bold"
+});
 const loadTextStyle = new PIXI.TextStyle({
     fill: "#000000",
     fontFamily: "\"Lucida Console\", Monaco, monospace",
@@ -73,6 +85,8 @@ var selectedSprite;
 var activePuzzles;
 var preloadedPuzzles;
 var puzzleIndex = 0;
+var currentPuzzleNumber = 1;
+var totalPuzzles = 0;
 var fromPoint;
 var allSprites = new Array(64);
 var inputDisabled;
@@ -86,6 +100,9 @@ var lastUpdateTime;
 var gameRunning = false;
 var lastTimeWarningSecond = timeWarningStartTime;
 var soundOn = true;
+var puzzleCounterText;
+var puzzleCounterInput;
+var puzzleCounterContainer;
 
 function setup() {
 	
@@ -176,6 +193,43 @@ function setup() {
 	textContainer.addChild(numSolvedText);
 	textContainer.addChild(loadingText);
 	
+	// Create puzzle counter and input
+	puzzleCounterContainer = new PIXI.Container();
+	puzzleCounterText = new PIXI.Text('Puzzle: 1 / ?', puzzleCounterTextStyle);
+	
+	// Create input box for puzzle number
+	let inputBackground = new PIXI.Graphics();
+	inputBackground.beginFill(0xFFFFFF);
+	inputBackground.drawRect(0, 0, 80, 30);
+	inputBackground.endFill();
+	
+	puzzleCounterInput = new PIXI.Text('1', puzzleCounterInputStyle);
+	puzzleCounterInput.x = 5;
+	puzzleCounterInput.y = 3;
+	
+	// Make input interactive
+	inputBackground.interactive = true;
+	inputBackground.buttonMode = true;
+	
+	inputBackground.on('pointerdown', function() {
+		let newPuzzleNum = prompt("Enter puzzle number (1-" + totalPuzzles + "):", currentPuzzleNumber);
+		if (newPuzzleNum !== null) {
+			let num = parseInt(newPuzzleNum);
+			if (!isNaN(num) && num >= 1 && num <= totalPuzzles) {
+				currentPuzzleNumber = num;
+				puzzleIndex = num - 1;
+				puzzleCounterInput.text = num;
+				loadSpecificPuzzle(puzzleIndex);
+				updatePuzzleCounterText();
+			}
+		}
+	});
+	
+	puzzleCounterContainer.addChild(inputBackground);
+	puzzleCounterContainer.addChild(puzzleCounterInput);
+	puzzleCounterContainer.addChild(puzzleCounterText);
+	textContainer.addChild(puzzleCounterContainer);
+	
 	window.addEventListener('resize', resize);
 	resize();
 	
@@ -202,7 +256,12 @@ function onPuzzlesLoaded() {
 		preloadPuzzles();
 	}//
 	loadingText.text = "";
-	loadNextPuzzle();
+	
+	// Set total puzzles count
+	totalPuzzles = activePuzzles.length;
+	updatePuzzleCounterText();
+	
+	loadSpecificPuzzle(puzzleIndex);
 	
 	if (gameIsTimed) {
 		timerValue = startTime;
@@ -211,6 +270,11 @@ function onPuzzlesLoaded() {
 	gameRunning = true;
 	lastUpdateTime = Date.now();
 	app.ticker.add(() => timeLoop());
+}
+
+function updatePuzzleCounterText() {
+	puzzleCounterText.text = "Puzzle: " + currentPuzzleNumber + " / " + totalPuzzles;
+	puzzleCounterInput.text = currentPuzzleNumber;
 }
 
 function validateMateInOne(fen) {
@@ -237,7 +301,7 @@ function preloadPuzzles() {
 
 function resize() {
 	let inset = 20;//
-	let scalePercent = 0.9;
+	let scalePercent = 0.85; // Reduced from 0.9 to make board smaller
 	
 	let w = window.innerWidth-inset;
 	let h = window.innerHeight-inset;
@@ -249,7 +313,9 @@ function resize() {
 	boardContainer.scale.set(scale);
 	pieceContainer.scale.set(scale);
 	let dstToTopEdge = (h-boardContainer.height)/2;
-	boardContainer.position.set((w-boardContainer.width)/2,(h-boardContainer.height)/2 - dstToTopEdge*.5);
+	// Move board down a bit more by adding a vertical offset
+	let verticalOffset = 40;
+	boardContainer.position.set((w-boardContainer.width)/2,(h-boardContainer.height)/2 - dstToTopEdge*.5 + verticalOffset);
 	pieceContainer.position.set(boardContainer.position.x,boardContainer.position.y);
 	
 	// position text
@@ -266,12 +332,24 @@ function resize() {
 
 function loadNextPuzzle() {
 	if (activePuzzles != undefined && activePuzzles.length > 0) {
-		var puzzleIndex = Math.floor(Math.random() * activePuzzles.length);
-		let myFen = activePuzzles[puzzleIndex].split(',')[1];
+		// Move to next puzzle
+		puzzleIndex = (puzzleIndex + 1) % activePuzzles.length;
+		currentPuzzleNumber = puzzleIndex + 1;
+		updatePuzzleCounterText();
+		
+		loadSpecificPuzzle(puzzleIndex);
+	}
+	else {
+		console.log("No puzzles loaded")
+	}
+}
+
+function loadSpecificPuzzle(index) {
+	if (activePuzzles != undefined && activePuzzles.length > 0 && index < activePuzzles.length) {
+		let myFen = activePuzzles[index].split(',')[1];
 
 		// double check that given position is mate in one, as there are currently some errors with puzzle generator where en-passant is involved.
 		if (validateMateInOne(myFen)) {
-			
 			setBoardFromFen(myFen);
 			chess = new Chess(myFen);
 			
@@ -284,11 +362,9 @@ function loadNextPuzzle() {
 			}
 		}
 		else {
+			// Skip invalid puzzle
 			loadNextPuzzle();
 		}
-	}
-	else {
-		console.log("No puzzles loaded")
 	}
 }
 
@@ -615,23 +691,39 @@ function restartgame() {
 	numSolved = 0;
 	numSolvedText.text = "solved: " + numSolved;
 	
+	// Reset to first puzzle
+	puzzleIndex = 0;
+	currentPuzzleNumber = 1;
+	updatePuzzleCounterText();
 	
 	gameRunning = true;
-	loadNextPuzzle();
+	loadSpecificPuzzle(puzzleIndex);
 }
 
 function setTextPositions() {
 	let boardEdgeBottom = boardContainer.position.y + boardContainer.height;
 	let posY = boardEdgeBottom + numSolvedText.height * .5;
+	let boardEdgeLeft = boardContainer.position.x;
 	
 	if (gameIsTimed) {
-		let boardEdgeLeft = boardContainer.position.x;
 		timerText.position.set(boardEdgeLeft+boardContainer.width*.25-timerText.width/2, posY);
 		numSolvedText.position.set(boardEdgeLeft+boardContainer.width*.75-numSolvedText.width/2, posY);
 	}
 	else {
 		numSolvedText.position.set(boardContainer.position.x + boardContainer.width/2 - numSolvedText.width/2, posY);
 	}
+	
+	// Position puzzle counter above the board with more space
+	puzzleCounterContainer.position.set(
+		boardEdgeLeft + boardContainer.width/2 - puzzleCounterText.width/2, 
+		boardContainer.position.y - puzzleCounterText.height * 2
+	);
+	
+	// Position the input box to the left of the counter text
+	puzzleCounterInput.x = 5;
+	puzzleCounterInput.y = 3;
+	puzzleCounterText.x = 90; // Position text after input box
+	puzzleCounterText.y = 3;
 }
 
 function playSound(sound) {
