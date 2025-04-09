@@ -65,6 +65,12 @@ const puzzleCounterInputStyle = new PIXI.TextStyle({
     fontSize: 24,
     fontWeight: "bold"
 });
+const nextButtonStyle = new PIXI.TextStyle({
+    fill: "#FFFFFF",
+    fontFamily: "\"Lucida Console\", Monaco, monospace",
+    fontSize: 24,
+    fontWeight: "bold"
+});
 const loadTextStyle = new PIXI.TextStyle({
     fill: "#000000",
     fontFamily: "\"Lucida Console\", Monaco, monospace",
@@ -103,6 +109,8 @@ var soundOn = true;
 var puzzleCounterText;
 var puzzleCounterInput;
 var puzzleCounterContainer;
+var nextButton;
+var nextButtonVisible = false;
 
 function setup() {
 	
@@ -230,6 +238,12 @@ function setup() {
 	puzzleCounterContainer.addChild(puzzleCounterText);
 	textContainer.addChild(puzzleCounterContainer);
 	
+	// Create Next button (initially hidden)
+	nextButton = createNextButton();
+	nextButton.visible = false;
+	// Add to app.stage directly to ensure it's on top of everything
+	app.stage.addChild(nextButton);
+	
 	window.addEventListener('resize', resize);
 	resize();
 	
@@ -322,12 +336,11 @@ function resize() {
 	numSolvedText.scale.set(scale);
 	timerText.scale.set(scale);
 	loadingText.scale.set(scale);
+	puzzleCounterContainer.scale.set(scale);
 	
 	setTextPositions();
 	
 	loadingText.position.set(boardContainer.position.x + boardContainer.width/2 - loadingText.width/2, boardContainer.position.y + boardContainer.height/2 - loadingText.height*1.25);//
-
-	
 }
 
 function loadNextPuzzle() {
@@ -561,11 +574,6 @@ function makeLegalMoveAndReset() {
 		highlightSquare(coordFromAlgebraic(bestMove.from), highlightCol_light, highlightCol_dark);
 		highlightSquare(coordFromAlgebraic(bestMove.to), highlightCol_light, highlightCol_dark);
 	}
-	
-	if (!suddenDeath) {
-		setTimeout(function(){loadNextPuzzle()},resetTime);
-	}
-	
 }
 
 function onDrag(e){
@@ -633,7 +641,9 @@ function onPuzzleCorrect() {
 	numSolved++;
 	numSolvedText.text = 'solved: ' +numSolved;
 	highlightSquare(blackKingCoord, checkmateHighlight_light, checkmateHighlight_dark);
-	setTimeout(function(){loadNextPuzzle()},500);
+	
+	// Show next button instead of automatically loading next puzzle
+	showNextButton();
 	
 	if (resetTimerOnSolve) {
 		timerPaused = true;
@@ -643,7 +653,14 @@ function onPuzzleCorrect() {
 function onPuzzleFailed() {
 	playSound(puzzleFailedSound);
 
-	setTimeout(function(){makeLegalMoveAndReset()},blackMoveDelay);
+	setTimeout(function(){
+		makeLegalMoveAndReset();
+		if (!suddenDeath) {
+			// Show next button instead of automatically loading next puzzle
+			showNextButton();
+		}
+	}, blackMoveDelay);
+	
 	if (suddenDeath) {
 		gameOver();
 	}
@@ -669,6 +686,11 @@ function gameOver() {
 		let pos = posFromSquareCoord(fromPoint);//
 		selectedSprite.position.set(pos.x,pos.y);
 		selectedSprite = null;
+	}
+	
+	// Hide next button if it's visible
+	if (nextButtonVisible) {
+		hideNextButton();
 	}
 	
 	timerText.style.fill = timeAlertCols[timeAlertCols.length-1];
@@ -724,6 +746,73 @@ function setTextPositions() {
 	puzzleCounterInput.y = 3;
 	puzzleCounterText.x = 90; // Position text after input box
 	puzzleCounterText.y = 3;
+	
+	// Position next button in the center of the board
+	if (nextButton) {
+		nextButton.position.set(
+			boardEdgeLeft + boardContainer.width/2 - nextButton.width/2,
+			boardContainer.position.y + boardContainer.height/2 - nextButton.height/2
+		);
+		// Make sure the button is scaled properly
+		nextButton.scale.set(boardContainer.scale.x);
+	}
+}
+
+function createNextButton() {
+	let container = new PIXI.Container();
+	
+	// Create button background
+	let background = new PIXI.Graphics();
+	background.beginFill(0x3498db);
+	background.drawRoundedRect(0, 0, 150, 50, 10);
+	background.endFill();
+	
+	// Create button text
+	let text = new PIXI.Text("Next", nextButtonStyle);
+	text.anchor.set(0.5);
+	text.position.set(background.width/2, background.height/2);
+	
+	container.addChild(background);
+	container.addChild(text);
+	
+	// Make button interactive
+	container.interactive = true;
+	container.buttonMode = true;
+	
+	// Add hover effects
+	container.on('pointerover', function() {
+		background.clear();
+		background.beginFill(0x2980b9);
+		background.drawRoundedRect(0, 0, 150, 50, 10);
+		background.endFill();
+	});
+	
+	container.on('pointerout', function() {
+		background.clear();
+		background.beginFill(0x3498db);
+		background.drawRoundedRect(0, 0, 150, 50, 10);
+		background.endFill();
+	});
+	
+	// Add click handler
+	container.on('pointerdown', function() {
+		hideNextButton();
+		loadNextPuzzle();
+	});
+	
+	return container;
+}
+
+function showNextButton() {
+	nextButton.visible = true;
+	nextButtonVisible = true;
+	inputDisabled = true;
+}
+
+function hideNextButton() {
+	nextButton.visible = false;
+	nextButtonVisible = false;
+	inputDisabled = false;
 }
 
 function playSound(sound) {
