@@ -820,14 +820,23 @@ function setTextPositions() {
 	puzzleCounterText.x = 90; // Position text after input box
 	puzzleCounterText.y = 3;
 	
-	// Position next button in the center of the board
+	// Position next button below the board, next to the solved text
 	if (nextButton) {
-		nextButton.position.set(
-			boardEdgeLeft + boardContainer.width/2 - nextButton.width/2,
-			boardContainer.position.y + boardContainer.height/2 - nextButton.height/2
-		);
+		if (gameIsTimed) {
+			// If game is timed, position next to the solved text on the right
+			nextButton.position.set(
+				boardEdgeLeft + boardContainer.width * 0.75 + numSolvedText.width/2 + 20,
+				posY
+			);
+		} else {
+			// If game is not timed, position next to the solved text
+			nextButton.position.set(
+				boardContainer.position.x + boardContainer.width/2 + numSolvedText.width/2 + 20,
+				posY
+			);
+		}
 		// Make sure the button is scaled properly
-		nextButton.scale.set(boardContainer.scale.x);
+		nextButton.scale.set(boardContainer.scale.x * 0.8);
 	}
 	
 	// Position auto-solve toggle in the top-right corner of the board
