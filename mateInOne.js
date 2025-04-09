@@ -13,6 +13,11 @@ var maxConfettiDuration = 5000; // 5 seconds minimum duration
 var confettiWaves = 0;
 var maxConfettiWaves = 3; // Number of waves of confetti
 
+// Cookie bar variables
+var cookieBarContainer;
+var cookieSprites = [];
+var maxCookies = 10;
+
 let app = new PIXI.Application({
 	autoResize: true,
 	width: nativeSize,
@@ -27,7 +32,11 @@ app.renderer.backgroundColor = 0x00000000;
 //Add the canvas that Pixi automatically created for you to the HTML document
 document.body.appendChild(app.view);
 
-PIXI.loader.add("sprites/pieces.png").load(setup);
+PIXI.loader
+    .add("sprites/pieces.png")
+    .add("sprites/cookie.png", "https://cdn-icons-png.flaticon.com/512/541/541732.png")
+    .add("sprites/empty-cookie.png", "https://cdn-icons-png.flaticon.com/512/1046/1046874.png")
+    .load(setup);
 
 // Behaviour:
 var useLocalFile = true;//
@@ -130,8 +139,13 @@ var nextButtonVisible = false;
 var autoSolveMode = true;
 var autoSolveToggle;
 var kingAttackers = [];
+var cookieTexture;
+var emptyCookieTexture;
 
 function setup() {
+    // Load cookie textures
+    cookieTexture = PIXI.loader.resources["sprites/cookie.png"].texture;
+    emptyCookieTexture = PIXI.loader.resources["sprites/empty-cookie.png"].texture;
 
 	// Get url params
 	if (GetURLParameter('suddenDeath') == 'true') {
@@ -182,12 +196,17 @@ function setup() {
 	// Create confetti container
 	confettiContainer = new PIXI.Container();
 
+    // Create cookie bar container
+    cookieBarContainer = new PIXI.Container();
+    createCookieBar();
+
 	app.stage.addChild(boardContainer);
     boardContainer.addChild(graphics);
 	boardContainer.addChild(highlightContainer);
 	app.stage.addChild(pieceContainer);
 	app.stage.addChild(textContainer);
 	app.stage.addChild(confettiContainer);
+    app.stage.addChild(cookieBarContainer);
 
     // Pieces in order: King, Queen, Bishop, Knight, Rook, Pawn [White,Black]
     pieceTextures = new Array(6);
@@ -372,6 +391,7 @@ function resize() {
 	if (autoSolveToggle) {
 		autoSolveToggle.scale.set(scale * 0.8);
 	}
+    cookieBarContainer.scale.set(scale * 0.8);
 
 	setTextPositions();
 
@@ -739,6 +759,9 @@ function onPuzzleCorrect() {
 	numSolvedText.text = 'solved: ' +numSolved;
 	highlightSquare(blackKingCoord, checkmateHighlight_light, checkmateHighlight_dark);
 
+    // Update cookie bar
+    updateCookieBar();
+
 	// Show next button instead of automatically loading next puzzle
 	showNextButton();
 
@@ -821,6 +844,9 @@ function restartgame() {
 	numSolved = 0;
 	numSolvedText.text = "solved: " + numSolved;
 
+    // Reset cookie bar
+    updateCookieBar();
+
 	// Reset to first puzzle
 	puzzleIndex = 0;
 	currentPuzzleNumber = 1;
@@ -837,10 +863,22 @@ function setTextPositions() {
 
 	if (gameIsTimed) {
 		timerText.position.set(boardEdgeLeft+boardContainer.width*.25-timerText.width/2, posY);
-		numSolvedText.position.set(boardEdgeLeft+boardContainer.width*.75-numSolvedText.width/2, posY);
+		numSolvedText.position.set(boardEdgeLeft+boardContainer.width*.85-numSolvedText.width/2, posY);
+
+        // Position cookie bar to the left of numSolvedText with margin from board
+        cookieBarContainer.position.set(
+            boardEdgeLeft + boardContainer.width * 0.85 - numSolvedText.width/2 - cookieBarContainer.width - 20,
+            boardEdgeBottom + 15
+        );
 	}
 	else {
-		numSolvedText.position.set(boardContainer.position.x + boardContainer.width/2 - numSolvedText.width/2, posY);
+		numSolvedText.position.set(boardContainer.position.x + boardContainer.width*0.7 - numSolvedText.width/2, posY);
+
+        // Position cookie bar to the left of numSolvedText with margin from board
+        cookieBarContainer.position.set(
+            boardContainer.position.x + boardContainer.width*0.7 - numSolvedText.width/2 - cookieBarContainer.width - 20,
+            boardEdgeBottom + 15
+        );
 	}
 
 	// Position puzzle counter above the board with more space
@@ -860,13 +898,13 @@ function setTextPositions() {
 		if (gameIsTimed) {
 			// If game is timed, position next to the solved text on the right
 			nextButton.position.set(
-				boardEdgeLeft + boardContainer.width * 0.75 + numSolvedText.width/2 + 20,
+				boardEdgeLeft + boardContainer.width * 0.85 + numSolvedText.width/2 + 20,
 				posY
 			);
 		} else {
 			// If game is not timed, position next to the solved text
 			nextButton.position.set(
-				boardContainer.position.x + boardContainer.width/2 + numSolvedText.width/2 + 20,
+				boardContainer.position.x + boardContainer.width*0.7 + numSolvedText.width/2 + 20,
 				posY
 			);
 		}
@@ -939,6 +977,56 @@ function hideNextButton() {
 	nextButton.visible = false;
 	nextButtonVisible = false;
 	inputDisabled = false;
+}
+
+function createCookieBar() {
+    // Clear existing cookies
+    while (cookieBarContainer.children.length > 0) {
+        cookieBarContainer.removeChild(cookieBarContainer.children[0]);
+    }
+    cookieSprites = [];
+
+    // Create background for cookie bar
+    let background = new PIXI.Graphics();
+    background.beginFill(0x34495e, 0.7);
+    background.drawRoundedRect(0, 0, 500, 60, 12);
+    background.endFill();
+    cookieBarContainer.addChild(background);
+
+    // Add cookies (or empty cookie placeholders)
+    const cookieSize = 42;
+    const cookieMargin = 6;
+    const startX = 15;
+	const startY = 10;
+
+    for (let i = 0; i < maxCookies; i++) {
+        let cookieSprite;
+
+        // Determine if this position should have a cookie or empty placeholder
+        if (i < (numSolved % maxCookies)) {
+            cookieSprite = new PIXI.Sprite(cookieTexture);
+        } else {
+            cookieSprite = new PIXI.Sprite(emptyCookieTexture);
+        }
+
+        cookieSprite.width = cookieSize;
+        cookieSprite.height = cookieSize;
+        cookieSprite.position.set(startX + i * (cookieSize + cookieMargin), startY + (40 - cookieSize) / 2);
+
+        cookieBarContainer.addChild(cookieSprite);
+        cookieSprites.push(cookieSprite);
+    }
+}
+
+function updateCookieBar() {
+    // Update cookies based on numSolved
+    for (let i = 0; i < maxCookies; i++) {
+        if (i < (numSolved % maxCookies)) {
+            cookieSprites[i].texture = cookieTexture;
+        } else {
+            cookieSprites[i].texture = emptyCookieTexture;
+        }
+    }
 }
 
 function createAutoSolveToggle() {
