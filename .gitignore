@@ -1,0 +1,4 @@
+.aider*
+.idea
+node_modules
+Resources/.DS_Store
