@@ -230,7 +230,7 @@ function setup() {
 
 	// text
 	numSolvedText = new PIXI.Text('solved: 0', numSolvedTextStyle);
-	loadingText = new PIXI.Text('fetching puzzles...', loadTextStyle);//
+	loadingText = new PIXI.Text('Loading chess engine...', loadTextStyle);//
 
 
 	timerText = new PIXI.Text('', timerTextStyle);
@@ -295,22 +295,35 @@ function setup() {
 	window.addEventListener('resize', resize);
 	resize();
 
-	if (useLocalFile) {
-		activePuzzles = fens.split('\n');
-		onPuzzlesLoaded();
+	// Check if Chess module is already loaded
+	if (window.chessModuleLoaded) {
+		if (useLocalFile) {
+			activePuzzles = fens.split('\n');
+			onPuzzlesLoaded();
+		}
+		else {
+			// OLD
+			// fetch initial puzzle set;
+		}
+	} else {
+		// Wait for Chess module to load
+		window.addEventListener('chessModuleLoaded', function() {
+			if (useLocalFile) {
+				activePuzzles = fens.split('\n');
+				onPuzzlesLoaded();
+			}
+			else {
+				// OLD
+				// fetch initial puzzle set;
+			}
+		});
 	}
-	else {
-		// OLD
-		// fetch initial puzzle set;
-	}
-
 
 	puzzleCorrectSound = new Audio('Resources/Audio/PuzzleCorrect.mp3');
 	puzzleFailedSound = new Audio('Resources/Audio/PuzzleFailed.mp3');
 	moveSound = new Audio('Resources/Audio/Move.mp3');
 	timeOutSound = new Audio('Resources/Audio/TimeOut.mp3');
 	timeWarningSound = new Audio('Resources/Audio/TimeWarning.mp3');
-
 }
 
 function onPuzzlesLoaded() {
@@ -325,12 +338,20 @@ function onPuzzlesLoaded() {
 
 	gameRunning = true;
 
-	loadSpecificPuzzle(puzzleIndex);
+	// Make sure Chess is loaded before proceeding
+	if (window.chessModuleLoaded) {
+		loadSpecificPuzzle(puzzleIndex);
+	} else {
+		loadingText.text = "Loading chess engine...";
+		window.addEventListener('chessModuleLoaded', function() {
+			loadingText.text = "";
+			loadSpecificPuzzle(puzzleIndex);
+		});
+	}
 
 	if (gameIsTimed) {
 		timerValue = startTime;
 	}
-
 
 	lastUpdateTime = Date.now();
 	app.ticker.add(() => timeLoop());
@@ -342,6 +363,12 @@ function updatePuzzleCounterText() {
 }
 
 function validateMateInOne(fen) {
+	// Make sure Chess is defined
+	if (typeof Chess === 'undefined') {
+		console.error('Chess is not defined yet');
+		return false;
+	}
+	
 	let chess = new Chess(fen);
 	if (validateFen(fen)) {
     	let moves = chess.moves();
