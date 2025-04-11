@@ -1,4 +1,4 @@
-var hangingFens = `0,r1b1r1k1/1pp2ppp/p1n1pq2/3P4/P2b2PP/1PN5/1BPPQPB1/2KR3R b - - 0 13,e6d5 e2e8
+var fens = `0,r1b1r1k1/1pp2ppp/p1n1pq2/3P4/P2b2PP/1PN5/1BPPQPB1/2KR3R b - - 0 13,e6d5 e2e8
 1,5rk1/5p1p/4p3/p3q3/8/Q5RP/6PK/8 b - - 1 37,g8h8 a3f8
 2,r3r1k1/1b2P3/p2p2R1/1ppP2q1/2P3p1/3Q4/PB3P1P/6K1 b - - 0 32,g5g6 d3g6
 3,r3r1k1/1b3ppp/3p1b2/pQpP4/Pp2P1q1/5N2/1P3PPP/R2NR1K1 b - - 1 19,b7c8 b5e8

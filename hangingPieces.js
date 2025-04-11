@@ -192,12 +192,12 @@ function setup() {
 
 	// Check if Chess module is already loaded
 	if (window.chessModuleLoaded) {
-		activePuzzles = hangingFens.split('\n');
+		activePuzzles = fens.split('\n');
 		onPuzzlesLoaded();
 	} else {
 		// Wait for Chess module to load
 		window.addEventListener('chessModuleLoaded', function() {
-			activePuzzles = hangingFens.split('\n');
+			activePuzzles = fens.split('\n');
 			onPuzzlesLoaded();
 		});
 	}
@@ -283,12 +283,12 @@ function loadSpecificPuzzle(index) {
 		if (gameRunning) {
 			// Initially disable input while first move is played
 			inputDisabled = true;
-			
+
 			if (resetTimerOnSolve) {
 				timerValue = startTime;
 			}
 			timerPaused = false;
-			
+
 			// Play the first move after a short delay
 			setTimeout(function() {
 				playFirstMove();
@@ -303,17 +303,17 @@ function playFirstMove() {
 		let firstMove = currentPuzzleMoves[0];
 		let from = firstMove.substring(0, 2);
 		let to = firstMove.substring(2, 4);
-		
+
 		// Make the move on the chess board
 		let moveObj = {
 			from: from,
 			to: to
 		};
-		
+
 		// Check if the move is legal
 		let legalMoves = chess.moves({ verbose: true });
 		let moveIsLegal = false;
-		
+
 		for (let i = 0; i < legalMoves.length; i++) {
 			if (legalMoves[i].from === from && legalMoves[i].to === to) {
 				moveIsLegal = true;
@@ -321,18 +321,18 @@ function playFirstMove() {
 				break;
 			}
 		}
-		
+
 		if (moveIsLegal) {
 			// Update the board display
 			setBoardFromFen(chess.fen());
-			
+
 			// Highlight the move
 			highlightSquare(coordFromAlgebraic(from), highlightCol_light, highlightCol_dark);
 			highlightSquare(coordFromAlgebraic(to), highlightCol_light, highlightCol_dark);
-			
+
 			// Play move sound
 			playSound(moveSound);
-			
+
 			// Enable input after the first move is played
 			setTimeout(function() {
 				inputDisabled = false;
