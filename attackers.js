@@ -1,5 +1,3 @@
-// Game-specific variables
-
 let app = new PIXI.Application({
 	autoResize: true,
 	width: nativeSize,
@@ -21,7 +19,6 @@ PIXI.loader
     .load(setup);
 
 // Behaviour:
-var useLocalFile = true;//
 var blackPiecesInactive = true;
 var resetTime = 750;
 var blackMoveDelay = 350;
@@ -187,25 +184,13 @@ function setup() {
 
 	// Check if Chess module is already loaded
 	if (window.chessModuleLoaded) {
-		if (useLocalFile) {
-			activePuzzles = fens.split('\n');
-			onPuzzlesLoaded();
-		}
-		else {
-			// OLD
-			// fetch initial puzzle set;
-		}
+		activePuzzles = fens.split('\n');
+		onPuzzlesLoaded();
 	} else {
 		// Wait for Chess module to load
 		window.addEventListener('chessModuleLoaded', function() {
-			if (useLocalFile) {
-				activePuzzles = fens.split('\n');
-				onPuzzlesLoaded();
-			}
-			else {
-				// OLD
-				// fetch initial puzzle set;
-			}
+			activePuzzles = fens.split('\n');
+			onPuzzlesLoaded();
 		});
 	}
 
@@ -217,9 +202,6 @@ function setup() {
 }
 
 function onPuzzlesLoaded() {
-	if (!useLocalFile) {
-		preloadPuzzles();
-	}//
 	loadingText.text = "";
 
 	// Set total puzzles count
@@ -268,13 +250,6 @@ function validateMateInOne(fen) {
 	return false;
 }
 
-function preloadPuzzles() {
-    fetch(puzzlesUrl).then((response) => {
-		response.text().then((response) => {
-		    preloadedPuzzles = response.split('<br>');
-		});
-	});
-}
 
 
 // Game-specific functions
