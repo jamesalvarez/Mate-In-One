@@ -35,7 +35,6 @@ var startTime = 180;//
 
 // Game-specific variables
 var currentPuzzleMoves = [];
-var instructionText;
 var kingAttackers = [];
 
 function setup() {
@@ -127,10 +126,6 @@ function setup() {
 	// text
 	numSolvedText = new PIXI.Text('solved: 0', numSolvedTextStyle);
 	loadingText = new PIXI.Text('Loading chess engine...', loadTextStyle);//
-
-	// Create instruction text
-	instructionText = new PIXI.Text('Find the hanging piece!', instructionTextStyle);
-	textContainer.addChild(instructionText);
 
 	timerText = new PIXI.Text('', timerTextStyle);
 	if (gameIsTimed) {
@@ -479,7 +474,7 @@ function tryMakeMove(fromCoord, toCoord) {
 				clearHighlights();
 				highlightSquare(fromCoord, highlightCol_light, highlightCol_dark);
 				highlightSquare(toCoord, highlightCol_light, highlightCol_dark);
-				
+
 				// Reset the puzzle after a delay
 				setTimeout(function() {
 					loadSpecificPuzzle(puzzleIndex);
@@ -510,72 +505,6 @@ function onPointerDownOnBoard(e) {
 	}
 }
 
-
-
-
-
-function setTextPositions() {
-	let boardEdgeBottom = boardContainer.position.y + boardContainer.height;
-	let posY = boardEdgeBottom + numSolvedText.height * .5;
-	let boardEdgeLeft = boardContainer.position.x;
-
-	// Position instruction text above the board
-	instructionText.position.set(
-		boardEdgeLeft + boardContainer.width/2 - instructionText.width/2,
-		boardContainer.position.y - instructionText.height * 3.5
-	);
-
-	if (gameIsTimed) {
-		timerText.position.set(boardEdgeLeft+boardContainer.width*.25-timerText.width/2, posY);
-		numSolvedText.position.set(boardEdgeLeft+boardContainer.width*.85-numSolvedText.width/2, posY);
-
-        // Position cookie bar to the left of numSolvedText with margin from board
-        cookieBarContainer.position.set(
-            boardEdgeLeft + boardContainer.width * 0.85 - numSolvedText.width/2 - cookieBarContainer.width - 20,
-            boardEdgeBottom + 15
-        );
-	}
-	else {
-		numSolvedText.position.set(boardContainer.position.x + boardContainer.width*0.7 - numSolvedText.width/2, posY);
-
-        // Position cookie bar to the left of numSolvedText with margin from board
-        cookieBarContainer.position.set(
-            boardContainer.position.x + boardContainer.width*0.7 - numSolvedText.width/2 - cookieBarContainer.width - 20,
-            boardEdgeBottom + 15
-        );
-	}
-
-	// Position puzzle counter above the board with more space
-	puzzleCounterContainer.position.set(
-		boardEdgeLeft + boardContainer.width/2 - puzzleCounterText.width/2,
-		boardContainer.position.y - puzzleCounterText.height * 2
-	);
-
-	// Position the input box to the left of the counter text
-	puzzleCounterInput.x = 5;
-	puzzleCounterInput.y = 3;
-	puzzleCounterText.x = 90; // Position text after input box
-	puzzleCounterText.y = 3;
-
-	// Position next button below the board, next to the solved text
-	if (nextButton) {
-		if (gameIsTimed) {
-			// If game is timed, position next to the solved text on the right
-			nextButton.position.set(
-				boardEdgeLeft + boardContainer.width * 0.85 + numSolvedText.width/2 + 20,
-				posY
-			);
-		} else {
-			// If game is not timed, position next to the solved text
-			nextButton.position.set(
-				boardContainer.position.x + boardContainer.width*0.7 + numSolvedText.width/2 + 20,
-				posY
-			);
-		}
-		// Make sure the button is scaled properly
-		nextButton.scale.set(boardContainer.scale.x * 0.8);
-	}
-}
 
 
 
