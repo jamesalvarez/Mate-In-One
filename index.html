@@ -71,29 +71,24 @@
     .game-options {
       background-color: #34495e;
       border-radius: 10px;
-      padding: 20px;
+      padding: 15px;
       width: 90%;
       max-width: 800px;
-      margin-bottom: 30px;
-    }
-    .section-title {
-      font-size: 24px;
-      margin-top: 0;
-      margin-bottom: 15px;
-      color: #ebebeb;
+      margin-top: 20px;
+      margin-bottom: 20px;
     }
     .option-group {
       display: flex;
       flex-wrap: wrap;
-      gap: 15px;
-      margin-bottom: 20px;
+      align-items: center;
+      gap: 10px;
     }
     .option-button {
       background-color: #222222;
       color: #ebebeb;
       border: none;
       border-radius: 5px;
-      padding: 10px 20px;
+      padding: 8px 15px;
       font-size: 16px;
       font-weight: bold;
       cursor: pointer;
@@ -107,54 +102,29 @@
     }
     .option-description {
       font-size: 16px;
-      color: #999999;
-      margin-bottom: 20px;
+      color: #ebebeb;
+      margin-left: 10px;
     }
     .time-controls {
       display: flex;
       align-items: center;
-      gap: 15px;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-left: 20px;
     }
     .time-display {
-      background-color: transparent;
-      color: #999999;
-      font-size: 18px;
-      padding: 10px;
-      min-width: 120px;
+      color: #ebebeb;
+      font-size: 16px;
+      min-width: 100px;
       text-align: center;
     }
     .hidden {
-      opacity: 0.15;
-      pointer-events: none;
+      display: none;
     }
   </style>
 </head>
 <body>
   <h1>Chess Puzzles</h1>
   
-  <!-- Game mode options -->
-  <div class="game-options">
-    <h2 class="section-title">Game Mode:</h2>
-    <div class="option-group" id="mode-buttons">
-      <button class="option-button selected" data-mode="endless">Endless</button>
-      <button class="option-button" data-mode="countdown">Countdown</button>
-      <button class="option-button" data-mode="streak">Streak</button>
-    </div>
-    <p class="option-description" id="mode-description">untimed, just solve puzzles</p>
-    
-    <div class="time-section hidden" id="time-section">
-      <h2 class="section-title">Time:</h2>
-      <div class="time-controls">
-        <button class="option-button" id="minus10">-10</button>
-        <button class="option-button" id="minus5">-5</button>
-        <div class="time-display" id="time-display">60 seconds</div>
-        <button class="option-button" id="plus5">+5</button>
-        <button class="option-button" id="plus10">+10</button>
-      </div>
-    </div>
-  </div>
-
   <div class="puzzle-container">
     <div class="puzzle-card" data-game="attackers">
       <h2>Find the King's attacker</h2>
@@ -172,6 +142,24 @@
       <h2>Hanging Pieces</h2>
       <p>Spot and capture an undefended piece.</p>
       <button class="play-button">Play Now</button>
+    </div>
+  </div>
+  
+  <!-- Game mode options -->
+  <div class="game-options">
+    <div class="option-group" id="mode-buttons">
+      <button class="option-button selected" data-mode="endless">Endless</button>
+      <button class="option-button" data-mode="countdown">Countdown</button>
+      <button class="option-button" data-mode="streak">Streak</button>
+      <span class="option-description" id="mode-description">untimed, just solve puzzles</span>
+      
+      <div class="time-controls hidden" id="time-section">
+        <button class="option-button" id="minus10">-10</button>
+        <button class="option-button" id="minus5">-5</button>
+        <span class="time-display" id="time-display">60 seconds</span>
+        <button class="option-button" id="plus5">+5</button>
+        <button class="option-button" id="plus10">+10</button>
+      </div>
     </div>
   </div>
 
@@ -211,7 +199,7 @@
         const index = Array.from(modeButtons).indexOf(button);
         modeDescription.textContent = modeDescriptions[index];
         
-        // Show/hide time section
+        // Show/hide time controls
         if (currentMode === 'endless') {
           timeSection.classList.add('hidden');
         } else {
