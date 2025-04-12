@@ -16,8 +16,8 @@ document.body.appendChild(app.view);
 
 PIXI.loader
     .add("sprites/pieces.png")
-    .add("sprites/cookie.png", "https://cdn-icons-png.flaticon.com/512/541/541732.png")
-    .add("sprites/empty-cookie.png", "https://cdn-icons-png.flaticon.com/512/1046/1046874.png")
+    .add("sprites/cookie.png")
+    .add("sprites/empty-cookie.png")
     .load(setup);
 
 // Behaviour:

@@ -16,8 +16,8 @@ document.body.appendChild(app.view);
 
 PIXI.loader
     .add("sprites/pieces.png")
-    .add("sprites/cookie.png", "https://cdn-icons-png.flaticon.com/512/541/541732.png")
-    .add("sprites/empty-cookie.png", "https://cdn-icons-png.flaticon.com/512/1046/1046874.png")
+    .add("sprites/cookie.png")
+    .add("sprites/empty-cookie.png")
     .load(setup);
 
 // Behaviour:
@@ -433,67 +433,64 @@ function tryMakeMove(fromCoord, toCoord) {
 	let toAlgebraic = pointToAlgebraic(toCoord);
 	let proposedMove = fromAlgebraic + toAlgebraic; // Remove the hyphen to match our move format
 
-	// Check if this is a capture move
+	// Check if this is a capture move or any legal move
 	let toIndex = indexFromCoord(toCoord);
 	let targetPiece = allSprites[toIndex];
+	let moveIsLegal = false;
+	let legalMoves = chess.moves({ verbose: true });
 
-	// If there's a piece at the target square and it's of opposite color
-	if (targetPiece && targetPiece.isWhite !== selectedSprite.isWhite) {
-		// This is a capture move
-		let moveIsLegal = false;
-		let legalMoves = chess.moves({ verbose: true });
-
-		for (let i = 0; i < legalMoves.length; i++) {
-			if (legalMoves[i].from === fromAlgebraic && legalMoves[i].to === toAlgebraic) {
-				moveIsLegal = true;
-				chess.move(legalMoves[i]);
-				break;
-			}
+	for (let i = 0; i < legalMoves.length; i++) {
+		if (legalMoves[i].from === fromAlgebraic && legalMoves[i].to === toAlgebraic) {
+			moveIsLegal = true;
+			chess.move(legalMoves[i]);
+			break;
 		}
+	}
 
-		if (moveIsLegal) {
-			// Capture was successful
-			playSound(moveSound);
+	if (moveIsLegal) {
+		// Move was successful
+		playSound(moveSound);
 
-			// Remove the captured piece
+		// If there was a piece at the target square, remove it (capture)
+		if (targetPiece) {
 			targetPiece.visible = false;
 			allSprites[toIndex] = null;
+		}
 
-			// Move the capturing piece
-			let pos = posFromSquareCoord(toCoord);
-			selectedSprite.position.set(pos.x, pos.y);
-			allSprites[indexFromCoord(fromCoord)] = null;
-			allSprites[toIndex] = selectedSprite;
+		// Move the piece
+		let pos = posFromSquareCoord(toCoord);
+		selectedSprite.position.set(pos.x, pos.y);
+		allSprites[indexFromCoord(fromCoord)] = null;
+		allSprites[toIndex] = selectedSprite;
 
-			// Highlight the capture
-			highlightSquare(fromCoord, highlightCol_light, highlightCol_dark);
-			highlightSquare(toCoord, checkmateHighlight_light, checkmateHighlight_dark);
+		// Highlight the move
+		highlightSquare(fromCoord, highlightCol_light, highlightCol_dark);
+		highlightSquare(toCoord, checkmateHighlight_light, checkmateHighlight_dark);
 
-			// Check if this is the correct move (second move in the puzzle)
-			if (currentPuzzleMoves && currentPuzzleMoves.length >= 2) {
-				let correctMove = currentPuzzleMoves[1];
-				if (proposedMove === correctMove) {
-					// Puzzle solved correctly
-					onPuzzleCorrect();
-				} else {
-					// Wrong capture, but still a legal move
-					// We'll allow it but not count it as correct
-					clearHighlights();
-					highlightSquare(fromCoord, highlightCol_light, highlightCol_dark);
-					highlightSquare(toCoord, highlightCol_light, highlightCol_dark);
-				}
-			} else {
-				// No correct move defined, just accept any legal capture
+		// Check if this is the correct move (second move in the puzzle)
+		if (currentPuzzleMoves && currentPuzzleMoves.length >= 2) {
+			let correctMove = currentPuzzleMoves[1];
+			if (proposedMove === correctMove) {
+				// Puzzle solved correctly
 				onPuzzleCorrect();
+			} else {
+				// Wrong move, but still legal
+				// We'll allow it but not count it as correct
+				clearHighlights();
+				highlightSquare(fromCoord, highlightCol_light, highlightCol_dark);
+				highlightSquare(toCoord, highlightCol_light, highlightCol_dark);
+				
+				// Reset the puzzle after a delay
+				setTimeout(function() {
+					loadSpecificPuzzle(puzzleIndex);
+				}, 1500);
 			}
 		} else {
-			// Invalid capture, return piece to original position
-			let pos = posFromSquareCoord(fromCoord);
-			selectedSprite.position.set(pos.x, pos.y);
-			clearHighlights();
+			// No correct move defined, just accept any legal move
+			onPuzzleCorrect();
 		}
-	} else if (indexFromCoord(toCoord) !== indexFromCoord(fromCoord)) {
-		// Not a capture move, return piece to original position
+	} else {
+		// Invalid move, return piece to original position
 		let pos = posFromSquareCoord(fromCoord);
 		selectedSprite.position.set(pos.x, pos.y);
 		clearHighlights();

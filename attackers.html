@@ -10,14 +10,14 @@
 		import { Chess, validateFen } from './Resources/chess.js'
 		window.Chess = Chess;
 		window.validateFen = validateFen;
-		
+
 		// Signal that Chess module is loaded
 		window.chessModuleLoaded = true;
 		window.dispatchEvent(new Event('chessModuleLoaded'));
 	</script>
 	<script src="utility.js"></script>
-	<script src="data.js"></script>
+	<script src="mates.js"></script>
 	<script src="common.js"></script>
-	<script src="mateInOne.js"></script>
+	<script src="attackers.js"></script>
 </body>
 </html>
