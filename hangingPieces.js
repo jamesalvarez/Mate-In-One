@@ -21,7 +21,6 @@ PIXI.loader
     .load(setup);
 
 // Behaviour:
-var blackPiecesInactive = false; // Allow black pieces to be moved
 var resetTime = 750;
 var blackMoveDelay = 350;
 const timeWarningStartTime = 3;

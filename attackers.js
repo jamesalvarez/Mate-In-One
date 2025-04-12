@@ -19,7 +19,6 @@ PIXI.loader
     .load(setup);
 
 // Behaviour:
-var blackPiecesInactive = true;
 var resetTime = 750;
 var blackMoveDelay = 350;
 const timeWarningStartTime = 3;
@@ -364,14 +363,12 @@ function initPieceSprite(sprite, point, size, isWhite){
     sprite.width = size;
     sprite.height = size;
     sprite.anchor.set(.5);
+	sprite.interactive = true;
+	sprite.buttonMode = true;
 
-	if (isWhite || !blackPiecesInactive){
-		sprite.interactive = true;
-		sprite.buttonMode = true;
+	sprite.on('pointerdown', () => onPieceSelected(sprite));
+	sprite.on('pointerup', onPieceReleased);
 
-		sprite.on('pointerdown', () => onPieceSelected(sprite));
-		sprite.on('pointerup', onPieceReleased);
-	}
     pieceContainer.addChild(sprite);
 
 	let squareIndex = indexFromCoord(squareCoordFromPoint(point));
