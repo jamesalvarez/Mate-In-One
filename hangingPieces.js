@@ -79,11 +79,7 @@ function playFirstMove() {
 		if (moveIsLegal) {
 			// Update the board display
 			setBoardFromFen(chess.fen());
-
-			// Highlight the move
-			highlightSquare(coordFromAlgebraic(from), highlightCol_light, highlightCol_dark);
-			highlightSquare(coordFromAlgebraic(to), highlightCol_light, highlightCol_dark);
-
+			
 			// Play move sound
 			playSound(moveSound);
 
