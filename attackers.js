@@ -34,8 +34,6 @@ var resetTimerOnSolve = false;
 var startTime = 180;//
 
 // Game-specific variables
-var autoSolveMode = true;
-var autoSolveToggle;
 var kingAttackers = [];
 
 function setup() {
@@ -184,10 +182,6 @@ function setup() {
 	nextButtonContainer.addChild(nextButton);
 	app.stage.addChild(nextButtonContainer);
 
-	// Create Auto-Solve toggle button
-	autoSolveToggle = createAutoSolveToggle();
-	textContainer.addChild(autoSolveToggle);
-
 	window.addEventListener('resize', resize);
 	resize();
 
@@ -260,7 +254,7 @@ function validateMateInOne(fen) {
 		console.error('Chess is not defined yet');
 		return false;
 	}
-	
+
 	let chess = new Chess(fen);
 	if (validateFen(fen)) {
     	let moves = chess.moves();
@@ -305,36 +299,19 @@ function loadSpecificPuzzle(index) {
 		let myFen = activePuzzles[index].split(',')[1];
 
 		// double check that given position is mate in one, as there are currently some errors with puzzle generator where en-passant is involved.
-		if (validateMateInOne(myFen)) {
-			console.log('Puzzle loaded, autosolvemode: ' + autoSolveMode + ', gameRunning: ' + gameRunning);
-			// If auto-solve mode is on, find and make the mate move immediately
-			if (autoSolveMode && gameRunning) {
-				chess = new Chess(myFen);
-				autoSolvePuzzle();
-				inputDisabled = false;
-			} else {
-				setBoardFromFen(myFen);
-				chess = new Chess(myFen);
-
-				if (gameRunning) {
-					inputDisabled = false;
-					if (resetTimerOnSolve) {
-						timerValue = startTime;
-					}
-					timerPaused = false;
-				}
-			}
+		if (validateMateInOne(myFen) & gameRunning) {
+			chess = new Chess(myFen);
+			autoSolvePuzzle();
+			inputDisabled = false;
 		}
 		else {
-			// Skip invalid puzzle
-			loadNextPuzzle();
+			loadNextPuzzle(); // Skip invalid puzzle
 		}
 	}
 }
 
 function autoSolvePuzzle() {
 	console.log('Auto-solving puzzle...');
-	if (!autoSolveMode) return;
 
 	// Find the checkmate move
 	let moves = chess.moves();
@@ -434,24 +411,14 @@ function onPieceSelected(sprite) {
 
 	fromPoint = squareCoordFromPoint(sprite.position);
 
-	if (!autoSolveMode) {
-		selectedSprite = sprite;
-		holdingSprite = true;
-
-		clearHighlights();
-		highlightSquare(fromPoint, highlightCol_light, highlightCol_dark);
-
-		//display piece on top of all other pieces
-		pieceContainer.removeChild(sprite);
-		pieceContainer.addChild(sprite);
-	}
-
 	// In auto-solve mode, check if the user clicked on a square with a piece attacking the king
-	if (autoSolveMode && kingAttackers && kingAttackers.length > 0) {
+	if (kingAttackers && kingAttackers.length > 0) {
 		let clickedSquare = pointToAlgebraic(fromPoint);
 		if (kingAttackers.includes(clickedSquare)) {
 			onPuzzleCorrect();
 		}
+	} else {
+		onPuzzleCorrect(); // Failsafe in case puzzle didn't have any king attackers
 	}
 
 }
@@ -673,74 +640,4 @@ function setTextPositions() {
 		// Make sure the button is scaled properly
 		nextButton.scale.set(boardContainer.scale.x * 0.8);
 	}
-
-	// Position auto-solve toggle in the top-right corner of the board
-	if (autoSolveToggle) {
-		autoSolveToggle.position.set(
-			boardEdgeLeft + boardContainer.width - autoSolveToggle.width - 10,
-			boardContainer.position.y - autoSolveToggle.height - 10
-		);
-		autoSolveToggle.scale.set(boardContainer.scale.x * 0.8);
-	}
 }
-
-
-
-function createAutoSolveToggle() {
-	let container = new PIXI.Container();
-
-	// Create button background
-	let background = new PIXI.Graphics();
-	background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
-	background.drawRoundedRect(0, 0, 200, 40, 8);
-	background.endFill();
-
-	// Create button text
-	let text = new PIXI.Text("Auto-Solve: ON", toggleButtonStyle);
-	text.anchor.set(0.5);
-	text.position.set(background.width/2, background.height/2);
-
-	container.addChild(background);
-	container.addChild(text);
-
-	// Make button interactive
-	container.interactive = true;
-	container.buttonMode = true;
-
-	// Add hover effects
-	container.on('pointerover', function() {
-		background.clear();
-		background.beginFill(autoSolveMode ? 0x16a085 : 0x2c3e50);
-		background.drawRoundedRect(0, 0, 200, 40, 8);
-		background.endFill();
-	});
-
-	container.on('pointerout', function() {
-		background.clear();
-		background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
-		background.drawRoundedRect(0, 0, 200, 40, 8);
-		background.endFill();
-	});
-
-	// Add click handler
-	container.on('pointerdown', function() {
-		autoSolveMode = !autoSolveMode;
-
-		// Update button appearance
-		background.clear();
-		background.beginFill(autoSolveMode ? 0x1abc9c : 0x34495e);
-		background.drawRoundedRect(0, 0, 200, 40, 8);
-		background.endFill();
-
-		// Update text
-		text.text = "Auto-Solve: " + (autoSolveMode ? "ON" : "OFF");
-
-		// If turning on auto-solve and a puzzle is currently displayed, solve it
-		if (autoSolveMode && gameRunning && !inputDisabled) {
-			autoSolvePuzzle();
-		}
-	});
-
-	return container;
-}
-
